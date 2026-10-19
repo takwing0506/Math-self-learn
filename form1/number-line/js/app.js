@@ -730,6 +730,7 @@
         (unlocked ? "" : " disabled") + ">" + esc(step.label) + (complete ? " ✓" : "") + "</button>";
     }).join("");
     return (
+      '<div class="back-bar"><div class="wrap"><a class="back-link" href="../">返回課題目錄</a></div></div>' +
       '<header class="top"><div class="wrap"><p class="kicker">中一數學</p><h1>數線棋</h1></div></header>' +
       '<nav class="stepper" aria-label="進度">' + nav + "</nav>" +
       '<main class="wrap">' + body +

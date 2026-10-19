@@ -49,6 +49,26 @@ h3 { font-size: 1.05rem; }
 }
 
 .wrap { width: min(1120px, calc(100% - 28px)); margin: 0 auto; }
+.back-bar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: #141210;
+  color: #f7f1e6;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: #f7f1e6;
+  font-weight: 700;
+  text-decoration: none;
+}
+.back-link:hover,
+.back-link:focus-visible { text-decoration: underline; }
 .top {
   background: var(--ink);
   color: #f7f1e6;
@@ -70,7 +90,7 @@ h3 { font-size: 1.05rem; }
   background: #ebe4d6;
   border-bottom: 1px solid #ddd2c0;
   position: sticky;
-  top: 0;
+  top: 44px;
   z-index: 30;
   min-height: 52px;
 }
@@ -173,7 +193,7 @@ input:focus, textarea:focus, button:focus-visible {
 .board-scroll svg { width: 100%; min-width: 640px; height: auto; display: block; }
 .stage {
   position: sticky;
-  top: 52px;
+  top: 96px;
   z-index: 20;
   background: var(--paper);
   padding-top: 8px;
@@ -369,11 +389,11 @@ caption { text-align: left; font-weight: 700; margin-bottom: 6px; }
 @media (min-width: 801px) {
   .stage { position: static; }
   .controls { position: static; }
-  .stage .stw { scroll-margin-top: 72px; }
+  .stage .stw { scroll-margin-top: 116px; }
 }
 @media (min-width: 980px) {
   .play-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; align-items: start; }
-  aside { position: sticky; top: 72px; }
+  aside { position: sticky; top: 116px; }
   .expr { font-size: 2.4rem; }
   .name-row.single { grid-template-columns: 1fr 1fr 1fr; }
   .workspace {
@@ -381,7 +401,7 @@ caption { text-align: left; font-weight: 700; margin-bottom: 6px; }
     grid-template-columns: minmax(0, 1fr) 320px;
     align-items: start;
   }
-  .workspace .record { position: sticky; top: 64px; grid-column: 2; grid-row: 1 / span 3; }
+  .workspace .record { position: sticky; top: 108px; grid-column: 2; grid-row: 1 / span 3; }
   .workspace .stage,
   .workspace .below,
   .workspace > .card { grid-column: 1; }
@@ -405,11 +425,11 @@ caption { text-align: left; font-weight: 700; margin-bottom: 6px; }
   .stepper { padding: 4px 8px; min-height: 44px; }
   .expr { font-size: 1.45rem; margin: 2px 0; }
   .status { padding: 4px 8px; font-size: 0.95rem; line-height: 1.4; }
-  .stage { top: 44px; padding-top: 4px; }
+  .stage { top: 88px; padding-top: 4px; }
   .stage .stw {
     padding: 4px 8px;
     margin: 2px 0 4px;
-    scroll-margin-top: 56px;
+    scroll-margin-top: 100px;
     scroll-margin-bottom: 196px;
   }
   .stage .stw h2 { font-size: 0.95rem; margin: 0; line-height: 1.15; letter-spacing: 0.12em; }
