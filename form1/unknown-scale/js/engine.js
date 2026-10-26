@@ -1,48 +1,87 @@
-/* 未知之秤 · 第一章規則
-   學生畫面只應使用 view() 的字串。solveLinear 只用於天平傾斜方向，不可拼進提示。 */
+/* 未知之秤 · 第一章
+   天平兩邊必須同時改變。移項＝兩邊同加／同減，再一起化簡。
+   除數＝兩邊同乘／同除。不要把一項搬過等號。
+   solveLinear 只供天平是否仍平衡的內部檢查，不可送進學生畫面。 */
 (function (root) {
   "use strict";
 
-  var MISSIONS = [
+  var MOTTO = "只有加減項先移項變號；乘除唔好移。";
+
+  var LAMPS = {
+    move: { id: "move", name: "移項", detail: "兩邊同加／同減" },
+    divide: { id: "divide", name: "除數", detail: "兩邊同乘／同除" },
+  };
+
+  var PRACTICE = [
     {
-      title: "入門訂單",
-      brief: "左盤有神秘箱和砝碼。請維持平衡，並讓 x 單獨留在一邊。",
+      title: "加上正數",
+      brief: "左盤有 x，也有正數砝碼。",
       L: [["x", 1], ["n", 7]],
       R: [["n", 12]],
-      divide: false,
     },
     {
-      title: "減號訂單",
-      brief: "左盤的砝碼是負的。把它移到對面時，符號會反過來。",
+      title: "抵消負數",
+      brief: "左盤的砝碼是負的。",
       L: [["x", 1], ["n", -9]],
       R: [["n", 4]],
-      divide: false,
     },
     {
-      title: "輕盤訂單",
-      brief: "右盤較輕。秤出的重量可以是負數。",
+      title: "秤出負數",
+      brief: "右盤比左盤的砝碼輕，x 可以是負數。",
       L: [["x", 1], ["n", 15]],
       R: [["n", 8]],
-      divide: false,
     },
     {
-      title: "負號之箱",
-      brief: "箱上記著負號。讓 x 單獨留下之後，還要把係數變成 1。",
+      title: "右盤有 x",
+      brief: "這次 x 在右盤。",
+      L: [["n", 18]],
+      R: [["x", 1], ["n", -5]],
+    },
+    {
+      title: "右盤是負數",
+      brief: "右盤的數是負的。",
+      L: [["x", 1], ["n", -3]],
+      R: [["n", -2]],
+    },
+  ];
+
+  var CHALLENGE = [
+    {
+      title: "常數在前",
+      brief: "常數寫在 x 前面。",
+      L: [["n", 4], ["x", 1]],
+      R: [["n", 1]],
+    },
+    {
+      title: "係數是 −1",
+      brief: "x 的係數是 −1。請用除數燈：兩邊同乘 −1，或兩邊同除以 −1。",
       L: [["x", -1], ["n", 6]],
       R: [["n", 10]],
       divide: true,
     },
     {
-      title: "右盤之箱",
-      brief: "這次神秘箱在右盤。移項的規則仍然相同。",
-      L: [["n", 18]],
-      R: [["x", 1], ["n", -5]],
-      divide: false,
+      title: "中間的 −x",
+      brief: "−x 寫在中間。請兩邊都加 x，再一起化簡。",
+      L: [["n", 9], ["x", -1]],
+      R: [["n", 4]],
+      addX: true,
     },
   ];
 
+  function normalizeMode(mode) {
+    return mode === "challenge" ? "challenge" : "practice";
+  }
+
+  function missionList(mode) {
+    return normalizeMode(mode) === "challenge" ? CHALLENGE : PRACTICE;
+  }
+
   function fmtInt(n) {
     return n < 0 ? "−" + Math.abs(n) : String(n);
+  }
+
+  function copyTerm(t) {
+    return { id: t.id, type: t.type, coeff: t.coeff };
   }
 
   function cloneSides(sides) {
@@ -52,29 +91,51 @@
     };
   }
 
-  function copyTerm(t) {
-    return { id: t.id, type: t.type, coeff: t.coeff };
-  }
-
   function mint(run, type, coeff) {
     return { id: "t" + run.nextId++, type: type, coeff: coeff };
   }
 
-  function locate(sides, id) {
-    var s, i;
-    for (s = 0; s < 2; s += 1) {
-      var side = s === 0 ? "L" : "R";
-      for (i = 0; i < sides[side].length; i += 1) {
-        if (sides[side][i].id === id) {
-          return { side: side, index: i, term: sides[side][i] };
-        }
-      }
-    }
-    return null;
+  function idsOf(sides) {
+    var out = [];
+    var i;
+    for (i = 0; i < sides.L.length; i += 1) out.push(sides.L[i].id);
+    for (i = 0; i < sides.R.length; i += 1) out.push(sides.R[i].id);
+    return out;
   }
 
-  function otherSide(side) {
-    return side === "L" ? "R" : "L";
+  function formatTerm(t, index) {
+    var body;
+    if (t.type === "x") {
+      if (t.coeff === 1) body = "x";
+      else if (t.coeff === -1) body = "−x";
+      else body = fmtInt(t.coeff) + "x";
+      if (index === 0) return body;
+      if (t.coeff < 0) return " − " + (t.coeff === -1 ? "x" : Math.abs(t.coeff) + "x");
+      return " + " + (t.coeff === 1 ? "x" : t.coeff + "x");
+    }
+    if (index === 0) return fmtInt(t.coeff);
+    return t.coeff < 0 ? " − " + Math.abs(t.coeff) : " + " + t.coeff;
+  }
+
+  function formatSide(terms) {
+    if (!terms.length) return "0";
+    var out = "";
+    var i;
+    for (i = 0; i < terms.length; i += 1) out += formatTerm(terms[i], i);
+    return out;
+  }
+
+  function formatEq(sides) {
+    return formatSide(sides.L) + " = " + formatSide(sides.R);
+  }
+
+  function tokenLabel(t) {
+    if (t.type === "x") {
+      if (t.coeff === 1) return "x";
+      if (t.coeff === -1) return "−x";
+      return fmtInt(t.coeff) + "x";
+    }
+    return fmtInt(t.coeff);
   }
 
   function weight(terms, x) {
@@ -106,526 +167,319 @@
     return B / A;
   }
 
-  function tiltFromWeights(lw, rw) {
-    if (lw === rw) return null;
-    return lw > rw ? "L" : "R";
-  }
-
-  function tiltDir(run, sides) {
-    var x = solveLinear(run.original);
-    if (x === null) return "L";
-    return tiltFromWeights(weight(sides.L, x), weight(sides.R, x));
-  }
-
-  function formatTerm(t, index) {
-    if (t.type === "x") {
-      var body;
-      if (t.coeff === 1) body = "x";
-      else if (t.coeff === -1) body = "−x";
-      else body = fmtInt(t.coeff) + "x";
-      if (index === 0) return body;
-      if (t.coeff < 0) return " − " + (t.coeff === -1 ? "x" : Math.abs(t.coeff) + "x");
-      return " + " + (t.coeff === 1 ? "x" : t.coeff + "x");
-    }
-    if (index === 0) return fmtInt(t.coeff);
-    return t.coeff < 0 ? " − " + Math.abs(t.coeff) : " + " + t.coeff;
-  }
-
-  function formatSide(terms) {
-    if (!terms.length) return "0";
-    var out = "";
-    var i;
-    for (i = 0; i < terms.length; i += 1) out += formatTerm(terms[i], i);
-    return out;
-  }
-
-  function pureUnitX(side) {
-    return side.length === 1 && side[0].type === "x" && side[0].coeff === 1;
-  }
-
-  function noX(side) {
-    var i;
-    for (i = 0; i < side.length; i += 1) if (side[i].type === "x") return false;
-    return true;
-  }
-
-  function revealsAnswer(sides) {
-    return sideReveals(sides.L, sides.R) || sideReveals(sides.R, sides.L);
-  }
-
-  function sideReveals(xSide, other) {
-    var i;
-    for (i = 0; i < other.length; i += 1) if (other[i].type === "x") return false;
-    if (!pureUnitX(xSide)) return false;
-    if (!other.length) return true;
-    return other.length === 1 && other[0].type === "n";
-  }
-
-  function formatEq(sides, sealed) {
-    if (sealed) {
-      if (pureUnitX(sides.R) && noX(sides.L)) return "？ = x";
-      return "x = ？";
-    }
-    return formatSide(sides.L) + " = " + formatSide(sides.R);
-  }
-
-  function isReady(sides) {
-    return (pureUnitX(sides.L) && noX(sides.R) && hasNumber(sides.R))
-      || (pureUnitX(sides.R) && noX(sides.L) && hasNumber(sides.L));
-  }
-
-  function hasNumber(side) {
-    var i;
-    for (i = 0; i < side.length; i += 1) if (side[i].type === "n") return true;
-    return false;
-  }
-
-  function canCheck(run) {
-    return !!run.sealed || isReady(run.sides);
-  }
-
-  function xSeparated(sides) {
-    return !mixed(sides.L) && !mixed(sides.R);
-  }
-
-  function mixed(side) {
-    var hasVar = false;
-    var hasNum = false;
-    var i;
-    for (i = 0; i < side.length; i += 1) {
-      if (side[i].type === "x") hasVar = true;
-      else hasNum = true;
-    }
-    return hasVar && hasNum;
-  }
-
-  function divideGoalMet(sides) {
-    var xs = sides.L.concat(sides.R).filter(function (t) { return t.type === "x"; });
-    return xs.length === 1 && xs[0].coeff === 1;
-  }
-
-  function countKind(side, type) {
+  function countKind(terms, type) {
     var n = 0;
     var i;
-    for (i = 0; i < side.length; i += 1) if (side[i].type === type) n += 1;
+    for (i = 0; i < terms.length; i += 1) if (terms[i].type === type) n += 1;
     return n;
   }
 
-  function hasPureNonUnit(sides) {
-    return nonUnit(sides.L, sides.R) || nonUnit(sides.R, sides.L);
+  function sideMessy(terms) {
+    return countKind(terms, "n") >= 2 || countKind(terms, "x") >= 2;
   }
 
-  function nonUnit(xSide, other) {
+  function canSimplify(sides) {
+    return sideMessy(sides.L) || sideMessy(sides.R);
+  }
+
+  function hasX(terms) {
+    return countKind(terms, "x") > 0;
+  }
+
+  function hasNegX(sides) {
+    var all = sides.L.concat(sides.R);
     var i;
-    for (i = 0; i < other.length; i += 1) if (other[i].type === "x") return false;
-    return xSide.length === 1 && xSide[0].type === "x" && xSide[0].coeff !== 1;
+    for (i = 0; i < all.length; i += 1) {
+      if (all[i].type === "x" && all[i].coeff < 0) return true;
+    }
+    return false;
   }
 
-  function singleXCoeff(sides) {
-    var xs = sides.L.concat(sides.R).filter(function (t) { return t.type === "x"; });
-    if (xs.length !== 1) return null;
-    return xs[0].coeff;
+  function unitX(side) {
+    return side.length === 1 && side[0].type === "x" && side[0].coeff === 1;
+  }
+
+  function plainNumber(side) {
+    if (!side.length) return true;
+    return side.length === 1 && side[0].type === "n";
+  }
+
+  function isReady(sides) {
+    return (unitX(sides.L) && plainNumber(sides.R)) || (unitX(sides.R) && plainNumber(sides.L));
+  }
+
+  function negAlone(xSide, other) {
+    var i;
+    if (xSide.length !== 1 || xSide[0].type !== "x" || xSide[0].coeff !== -1) return false;
+    for (i = 0; i < other.length; i += 1) if (other[i].type === "x") return false;
+    return true;
+  }
+
+  function pureNegUnit(sides) {
+    return negAlone(sides.L, sides.R) || negAlone(sides.R, sides.L);
+  }
+
+  function blockerCoeff(sides) {
+    if (hasX(sides.L) && hasX(sides.R)) return null;
+    var side = hasX(sides.L) ? sides.L : hasX(sides.R) ? sides.R : null;
+    if (!side) return null;
+    var nums = [];
+    var i;
+    for (i = 0; i < side.length; i += 1) if (side[i].type === "n") nums.push(side[i]);
+    if (nums.length !== 1) return null;
+    return nums[0].coeff;
   }
 
   function suggest(run) {
-    if (run.mode !== "guide") return null;
-    if (canCheck(run)) return "check";
-    if (
-      countKind(run.sides.L, "n") >= 2 || countKind(run.sides.R, "n") >= 2 ||
-      countKind(run.sides.L, "x") >= 2 || countKind(run.sides.R, "x") >= 2
-    ) return "collect";
-    if (hasPureNonUnit(run.sides)) return "divide";
-    if (!xSeparated(run.sides)) return "move";
-    if (!divideGoalMet(run.sides)) return "divide";
-    return "move";
+    var blocker;
+    if (run.mode !== "practice") return null;
+    if (isReady(run.sides)) return { type: "check", value: null };
+    if (canSimplify(run.sides)) return { type: "simplify", value: null };
+    if (pureNegUnit(run.sides)) return { type: "div", value: -1 };
+    if (run.mission.addX && hasNegX(run.sides)) return { type: "addx", value: 1 };
+    blocker = blockerCoeff(run.sides);
+    if (blocker !== null) return { type: "add", value: -blocker };
+    return null;
   }
 
-  function tokenLabel(t, sealed) {
-    if (sealed && t.type === "n") return "？";
-    if (t.type === "x") {
-      if (t.coeff === 1) return "x";
-      if (t.coeff === -1) return "−x";
-      return fmtInt(t.coeff) + "x";
-    }
-    return fmtInt(t.coeff);
-  }
-
-  function phrase(term) {
-    if (term.type === "x") {
-      if (term.coeff === 1) return "x";
-      if (term.coeff === -1) return "−x";
-      return fmtInt(term.coeff) + "x";
-    }
-    return term.coeff < 0 ? "−" + Math.abs(term.coeff) : "＋" + term.coeff;
-  }
-
-  function syncEq(run) {
-    var eq = formatEq(run.sides, run.sealed);
-    if (run.steps[run.steps.length - 1] !== eq) run.steps.push(eq);
-    return eq;
-  }
-
-  function pushHistory(run) {
-    run.history.push({
-      sides: cloneSides(run.sides),
-      sealed: run.sealed,
-      beforeSeal: run.beforeSeal,
-      steps: run.steps.slice(),
-    });
-    if (run.history.length > 40) run.history.shift();
-  }
-
-  function readyTail(run) {
-    if (canCheck(run) && !run.sealed) return "可以到複秤交貨。";
-    return "";
-  }
-
-  function commit(run, nextSides, messageFn) {
-    var before = formatEq(run.sides, false);
-    pushHistory(run);
-    run.sides = nextSides;
-    if (revealsAnswer(run.sides)) {
-      run.sealed = true;
-      run.beforeSeal = before;
-    }
-    var eq = syncEq(run);
-    return {
-      ok: true,
-      applied: true,
-      sealed: !!run.sealed,
-      tilt: null,
-      equation: eq,
-      message: messageFn(eq, !!run.sealed),
-    };
-  }
-
-  function sealedBlock() {
-    return {
-      ok: false,
-      applied: false,
-      message: "x 已分開。請到複秤填寫；若要改步驟，請返回上一步。",
-    };
-  }
-
-  function penalize(run, label) {
-    run.misses.push(label);
-    if (run.score <= 0) {
-      run.score = 0;
-      return "得分維持 0。";
-    }
-    run.score = Math.max(0, run.score - 10);
-    return "扣 10 分，現為 " + run.score + " 分。";
-  }
-
-  function bad(message, tilt) {
-    return { ok: false, applied: false, tilt: tilt || null, message: message };
-  }
-
-  function createRun(index, mode) {
-    var mission = MISSIONS[index];
-    if (!mission) throw new Error("沒有這張訂單");
-    var nextId = 1;
-    function take(pair) {
-      return { id: "t" + nextId++, type: pair[0], coeff: pair[1] };
-    }
-    var sides = {
-      L: mission.L.map(take),
-      R: mission.R.map(take),
-    };
-    return {
-      index: index,
-      mode: mode === "challenge" ? "challenge" : "guide",
-      sides: sides,
-      original: cloneSides(sides),
-      nextId: nextId,
-      score: 100,
-      misses: [],
-      history: [],
-      sealed: false,
-      beforeSeal: "",
-      steps: [formatEq(sides, false)],
-      checkTries: 0,
-      bonus: 0,
-      solved: false,
-      entry: null,
-    };
-  }
-
-  function missionInfo(index) {
-    var mission = MISSIONS[index];
-    return {
-      index: index,
-      number: index + 1,
-      total: MISSIONS.length,
-      title: mission.title,
-      brief: mission.brief,
-      divide: mission.divide,
-    };
-  }
-
-  function chipsOf(run) {
-    if (run.sealed) return [];
+  function magnitudes(sides) {
     var set = {};
-    ["L", "R"].forEach(function (side) {
-      run.sides[side].forEach(function (t) {
+    var i;
+    ["L", "R"].forEach(function (name) {
+      for (i = 0; i < sides[name].length; i += 1) {
+        var t = sides[name][i];
         if (t.type === "n" && t.coeff !== 0) set[Math.abs(t.coeff)] = true;
-      });
+      }
     });
     return Object.keys(set).map(Number).sort(function (a, b) { return a - b; });
   }
 
-  function lampsOf(run, sug) {
-    var moveMet = xSeparated(run.sides) || run.sealed;
-    var divMet = divideGoalMet(run.sides) || run.sealed;
-    var needDivide = MISSIONS[run.index].divide;
-    function pack(id, state) {
-      return { id: id, state: state, hint: !!sug && sug === id && state !== "done" };
-    }
-    return [
-      pack("denom", "skip"),
-      pack("expand", "skip"),
-      pack("move", moveMet ? "done" : "need"),
-      pack("collect", "skip"),
-      pack("divide", !needDivide ? "skip" : (divMet ? "done" : "need")),
-    ];
+  function sameAction(action, sug) {
+    if (!sug || sug.type === "check") return false;
+    if (action.type !== sug.type) return false;
+    if (action.type === "simplify") return true;
+    return action.value === sug.value;
   }
 
-  function view(run) {
-    var info = missionInfo(run.index);
+  function listActions(run) {
     var sug = suggest(run);
-    function tokens(side) {
-      return run.sides[side].map(function (t) {
-        var hidden = run.sealed && t.type === "n";
-        return {
-          id: t.id,
-          type: t.type,
-          side: side,
-          label: tokenLabel(t, run.sealed),
-          neg: !hidden && t.coeff < 0,
-          secret: hidden,
-        };
-      });
+    var actions = [];
+    var mags;
+    var i;
+    if (canSimplify(run.sides)) {
+      actions.push({ type: "simplify", value: null, group: "tidy", label: "兩邊一起化簡" });
     }
-    return {
-      number: info.number,
-      total: info.total,
-      title: info.title,
-      brief: info.brief,
-      mode: run.mode,
-      score: run.score,
-      equation: formatEq(run.sides, run.sealed),
-      originalEquation: formatEq(run.original, false),
-      beforeSeal: run.sealed ? run.beforeSeal : "",
-      steps: run.steps.slice(),
-      sealed: !!run.sealed,
-      ready: canCheck(run),
-      suggest: sug,
-      tokens: { L: tokens("L"), R: tokens("R") },
-      lamps: lampsOf(run, sug),
-      chips: chipsOf(run),
-      xCoeff: run.sealed ? null : singleXCoeff(run.sides),
-      canUndo: run.history.length > 0,
-      checkTries: run.checkTries,
-      bonus: run.bonus,
-      solved: !!run.solved,
-    };
+    mags = magnitudes(run.sides);
+    for (i = 0; i < mags.length; i += 1) {
+      actions.push({ type: "add", value: mags[i], group: "sum", label: "兩邊都加 " + mags[i] });
+      actions.push({ type: "add", value: -mags[i], group: "sum", label: "兩邊都減 " + mags[i] });
+    }
+    if (run.mission.addX) {
+      actions.push({ type: "addx", value: 1, group: "x", label: "兩邊都加 x" });
+      actions.push({ type: "addx", value: -1, group: "x", label: "兩邊都減 x" });
+    }
+    if (run.mission.divide) {
+      actions.push({ type: "mul", value: -1, group: "scale", label: "兩邊同乘 −1" });
+      actions.push({ type: "div", value: -1, group: "scale", label: "兩邊同除以 −1" });
+    }
+    for (i = 0; i < actions.length; i += 1) actions[i].guided = sameAction(actions[i], sug);
+    return actions;
   }
 
-  function resultOf(run) {
-    if (!run.solved) return null;
-    var counts = {};
-    run.misses.forEach(function (label) {
-      counts[label] = (counts[label] || 0) + 1;
-    });
+  function combineSide(run, terms) {
+    var xIndex = -1;
+    var nIndex = -1;
+    var xc = 0;
+    var nc = 0;
+    var i;
+    for (i = 0; i < terms.length; i += 1) {
+      if (terms[i].type === "x") {
+        if (xIndex < 0) xIndex = i;
+        xc += terms[i].coeff;
+      } else {
+        if (nIndex < 0) nIndex = i;
+        nc += terms[i].coeff;
+      }
+    }
+    var xTerm = xIndex >= 0 && xc !== 0 ? mint(run, "x", xc) : null;
+    var nTerm = nIndex >= 0 && nc !== 0 ? mint(run, "n", nc) : null;
+    if (xTerm && nTerm) return nIndex < xIndex ? [nTerm, xTerm] : [xTerm, nTerm];
+    if (xTerm) return [xTerm];
+    if (nTerm) return [nTerm];
+    return [];
+  }
+
+  function snapshot(run) {
     return {
-      entry: run.entry,
-      score: run.score,
-      bonus: run.bonus,
-      deductions: Object.keys(counts).map(function (label) {
-        return { label: label, times: counts[label], points: counts[label] * 10 };
+      sides: cloneSides(run.sides),
+      steps: run.steps.map(function (step) {
+        return { equation: step.equation, lamp: step.lamp, note: step.note };
       }),
     };
   }
 
-  function moveTerm(run, id, flip) {
-    if (run.sealed) return sealedBlock();
-    var loc = locate(run.sides, id);
-    if (!loc) return bad("找不到這個砝碼。");
-    var src = loc.side;
-    var dst = otherSide(src);
-    var next = cloneSides(run.sides);
-    var index = next[src].findIndex(function (t) { return t.id === id; });
-    var removed = next[src].splice(index, 1)[0];
-    var landed = {
-      id: removed.id,
-      type: removed.type,
-      coeff: flip ? -removed.coeff : removed.coeff,
-    };
-    next[dst].push(landed);
-    if (!flip) {
-      var tilt = tiltDir(run, next);
-      var pen = penalize(run, "移項未變號");
-      var expect = { type: removed.type, coeff: -removed.coeff };
-      return bad(
-        "移項要變號。" + phrase(removed) + " 到另一邊應變成 " + phrase(expect) + "。天平傾斜。" + pen,
-        tilt
-      );
-    }
-    return commit(run, next, function (eq, sealed) {
-      var head = "移項完成，" + phrase(removed) + " 變成 " + phrase(landed) + "。";
-      if (sealed) return head + "x 已分開，請到複秤填寫，此處不顯示數字。";
-      return head + "現在是 " + eq + "。" + readyTail(run);
-    });
+  function pushHistory(run) {
+    run.history.push(snapshot(run));
+    if (run.history.length > 40) run.history.shift();
   }
 
-  function addToPans(run, side, value) {
-    if (run.sealed) return sealedBlock();
+  function commit(run, nextSides, lamp, note, banner, message) {
+    var prev = {};
+    var fresh = [];
+    var i;
+    var oldIds = idsOf(run.sides);
+    for (i = 0; i < oldIds.length; i += 1) prev[oldIds[i]] = true;
+    pushHistory(run);
+    run.sides = nextSides;
+    run.lampsConfirmed = false;
+    var eq = formatEq(run.sides);
+    run.steps.push({ equation: eq, lamp: lamp, note: note });
+    var now = idsOf(run.sides);
+    for (i = 0; i < now.length; i += 1) if (!prev[now[i]]) fresh.push(now[i]);
+    if (!fresh.length) fresh = now.slice();
+    run.freshIds = fresh;
+    if (isReady(run.sides)) message += "可以到複秤。";
+    return {
+      ok: true,
+      applied: true,
+      equation: eq,
+      banner: banner,
+      message: message,
+    };
+  }
+
+  function bad(message) {
+    return { ok: false, applied: false, banner: "", message: message };
+  }
+
+  function addBoth(run, value) {
     if (!Number.isInteger(value) || value === 0 || Math.abs(value) > 99) {
       return bad("請選擇 −99 到 99 之間、不是 0 的整數。");
     }
-    if (side === "both") {
-      var next = cloneSides(run.sides);
-      next.L.push(mint(run, "n", value));
-      next.R.push(mint(run, "n", value));
-      var verb = value > 0 ? "加上 " : "減去 ";
-      var mag = Math.abs(value);
-      return commit(run, next, function (eq, sealed) {
-        var head = "兩邊同時" + verb + mag + "，天平保持平衡。";
-        if (sealed) return head + "x 已分開，請到複秤填寫，此處不顯示數字。";
-        return head + "現在是 " + eq + "。" + readyTail(run);
-      });
-    }
-    if (side !== "L" && side !== "R") return bad("請選擇左盤、右盤或兩邊。");
-    var trial = cloneSides(run.sides);
-    trial[side].push({ id: "tmp", type: "n", coeff: value });
-    var tilt = tiltDir(run, trial);
-    var pen = penalize(run, "只改動一邊");
-    var which = side === "L" ? "左盤" : "右盤";
-    return bad("只把砝碼放在" + which + "，天平傾斜。兩邊要加上或減去同一個數。" + pen, tilt);
-  }
-
-  function combineTerms(run, terms) {
-    var xc = 0;
-    var nc = 0;
-    var hasX = false;
-    var hasN = false;
-    terms.forEach(function (t) {
-      if (t.type === "x") {
-        xc += t.coeff;
-        hasX = true;
-      } else {
-        nc += t.coeff;
-        hasN = true;
-      }
-    });
-    var out = [];
-    if (hasX && xc !== 0) out.push(mint(run, "x", xc));
-    if (hasN && nc !== 0) out.push(mint(run, "n", nc));
-    return out;
-  }
-
-  function mergeSide(run, side) {
-    if (run.sealed) return sealedBlock();
-    if (side !== "L" && side !== "R") return bad("請選擇一盤。");
-    var terms = run.sides[side];
-    if (countKind(terms, "x") < 2 && countKind(terms, "n") < 2) {
-      return bad("這一盤沒有可合併的同類項。");
-    }
     var next = cloneSides(run.sides);
-    next[side] = combineTerms(run, terms);
-    if (revealsAnswer(next)) {
-      return bad("合併後會直接寫出 x 的值。請保留現在的算式，到複秤自行計算。");
-    }
-    return commit(run, next, function (eq, sealed) {
-      if (sealed) return "已合併同類項。x 已分開，請到複秤填寫，此處不顯示數字。";
-      return "已合併同類項。現在是 " + eq + "。" + readyTail(run);
-    });
+    next.L.push(mint(run, "n", value));
+    next.R.push(mint(run, "n", value));
+    var mag = Math.abs(value);
+    var note = value > 0 ? "兩邊都加 " + mag : "兩邊都減 " + mag;
+    var said = value > 0 ? "兩邊都加了 " + mag : "兩邊都減了 " + mag;
+    var banner = value > 0 ? "兩邊 +" + mag : "兩邊 −" + mag;
+    return commit(run, next, "move", note, banner, said + "。現在是 " + formatEq(next) + "。");
   }
 
-  function mergeTwo(run, idA, idB) {
-    if (run.sealed) return sealedBlock();
-    if (!idA || !idB || idA === idB) return bad("請疊到另一個同類項上。");
-    var a = locate(run.sides, idA);
-    var b = locate(run.sides, idB);
-    if (!a || !b) return bad("找不到這個砝碼。");
-    if (a.side !== b.side) return bad("兩個項要在同一盤才能合併。跨盤請用移項。");
-    if (a.term.type !== b.term.type) return bad("只有同類項可以合併。");
-    var coeff = a.term.coeff + b.term.coeff;
+  function simplifyBoth(run) {
+    if (!canSimplify(run.sides)) return bad("兩邊都沒有可以合併的同類項。");
+    var next = {
+      L: combineSide(run, run.sides.L),
+      R: combineSide(run, run.sides.R),
+    };
+    return commit(
+      run,
+      next,
+      "move",
+      "兩邊一起化簡",
+      "兩邊化簡",
+      "兩邊一起化簡。現在是 " + formatEq(next) + "。"
+    );
+  }
+
+  function addXBoth(run, value) {
+    if (!run.mission.addX) return bad("這一題不用加 x。");
+    if (value !== 1 && value !== -1) return bad("請兩邊同加 x，或兩邊同減 x。");
     var next = cloneSides(run.sides);
-    next[a.side] = next[a.side].filter(function (t) { return t.id !== idA && t.id !== idB; });
-    if (coeff !== 0) next[a.side].push(mint(run, a.term.type, coeff));
-    if (revealsAnswer(next)) {
-      return bad("合併後會直接寫出 x 的值。請保留現在的算式，到複秤自行計算。");
-    }
-    return commit(run, next, function (eq, sealed) {
-      if (sealed) return "已合併同類項。x 已分開，請到複秤填寫，此處不顯示數字。";
-      return "已合併同類項。現在是 " + eq + "。" + readyTail(run);
-    });
+    next.L.push(mint(run, "x", value));
+    next.R.push(mint(run, "x", value));
+    var note = value > 0 ? "兩邊都加 x" : "兩邊都減 x";
+    var said = value > 0 ? "兩邊都加了 x" : "兩邊都減了 x";
+    var banner = value > 0 ? "兩邊 +x" : "兩邊 −x";
+    return commit(run, next, "move", note, banner, said + "。現在是 " + formatEq(next) + "。");
   }
 
-  function divisible(sides, divisor) {
-    var ok = true;
-    ["L", "R"].forEach(function (side) {
-      sides[side].forEach(function (t) {
-        if (t.coeff % divisor !== 0) ok = false;
-      });
+  function scaleBoth(run, factor, kind) {
+    if (!run.mission.divide) return bad("這一題不用乘除。");
+    if (factor !== -1) return bad("本章只把兩邊同乘 −1，或同除以 −1。");
+    var next = cloneSides(run.sides);
+    ["L", "R"].forEach(function (name) {
+      var i;
+      for (i = 0; i < next[name].length; i += 1) next[name][i].coeff *= -1;
+      next[name] = next[name].filter(function (t) { return t.coeff !== 0; });
     });
-    return ok;
+    var note = kind === "div" ? "兩邊同除以 −1" : "兩邊同乘 −1";
+    var said = kind === "div" ? "兩邊同除以 −1" : "兩邊同乘了 −1";
+    var banner = kind === "div" ? "兩邊 ÷ −1" : "兩邊 × −1";
+    return commit(run, next, "divide", note, banner, said + "。現在是 " + formatEq(next) + "。");
   }
 
-  function divide(run, side, divisor) {
-    if (run.sealed) return sealedBlock();
-    if (!Number.isInteger(divisor)) return bad("請輸入整數除數。");
-    if (divisor === 0) return bad("除數不能是 0。");
-    if (divisor === 1) return bad("除以 1 不會改變方程。");
-    if (side === "both") {
-      if (!divisible(run.sides, divisor)) {
-        return bad("各項不能被這個數整除。請換一個除數，使每一項都得到整數。");
-      }
-      var next = cloneSides(run.sides);
-      ["L", "R"].forEach(function (name) {
-        next[name].forEach(function (t) { t.coeff /= divisor; });
-        next[name] = next[name].filter(function (t) { return t.coeff !== 0; });
-      });
-      return commit(run, next, function (eq, sealed) {
-        var head = "兩邊已同除以 " + fmtInt(divisor) + "。";
-        if (sealed) return head + "x 已分開，請到複秤填寫，此處不顯示數字。";
-        return head + "現在是 " + eq + "。" + readyTail(run);
-      });
-    }
-    if (side !== "L" && side !== "R") return bad("請選擇兩邊或其中一盤。");
-    var x = solveLinear(run.original);
-    var lw = weight(run.sides.L, x);
-    var rw = weight(run.sides.R, x);
-    if (side === "L") lw /= divisor;
-    else rw /= divisor;
-    var tilt = x === null ? "L" : tiltFromWeights(lw, rw);
-    var pen = penalize(run, "只除一邊");
-    var which = side === "L" ? "左盤" : "右盤";
-    return bad("只除" + which + "，等式不再成立，天平傾斜。" + pen, tilt);
+  function applyAction(run, action) {
+    if (!action || !action.type) return bad("請按一個操作。");
+    if (action.type === "add") return addBoth(run, action.value);
+    if (action.type === "simplify") return simplifyBoth(run);
+    if (action.type === "addx") return addXBoth(run, action.value);
+    if (action.type === "mul") return scaleBoth(run, action.value, "mul");
+    if (action.type === "div") return scaleBoth(run, action.value, "div");
+    return bad("沒有這個操作。");
   }
 
   function undo(run) {
     if (!run.history.length) return bad("沒有可以返回的步驟。");
     var prev = run.history.pop();
     run.sides = prev.sides;
-    run.sealed = prev.sealed;
-    run.beforeSeal = prev.beforeSeal;
-    run.steps = prev.steps.slice();
-    return { ok: true, applied: true, message: "已返回上一步。" };
+    run.steps = prev.steps.map(function (step) {
+      return { equation: step.equation, lamp: step.lamp, note: step.note };
+    });
+    run.lampsConfirmed = false;
+    run.freshIds = [];
+    return { ok: true, applied: true, banner: "", message: "已返回上一步。" };
   }
 
   function notReadyMessage(run) {
-    if (run.mode !== "guide") return "x 還沒有以係數 1 單獨留在一邊。";
-    var step = suggest(run);
-    if (step === "divide") return "x 的係數還不是 1。請先把兩邊同除以這個係數。";
-    if (step === "collect") return "x 還沒有單獨留在一邊。同一盤的同類項可以先合併。";
-    return "x 還沒有以係數 1 單獨留在一邊。";
+    var sug;
+    if (run.mode !== "practice") return "x 還未單獨留在一邊。";
+    sug = suggest(run);
+    if (!sug || sug.type === "check") return "x 還未單獨留在一邊。";
+    if (sug.type === "simplify") return "請先按「兩邊一起化簡」。";
+    if (sug.type === "add" && sug.value > 0) return "請先按「兩邊都加 " + sug.value + "」。";
+    if (sug.type === "add") return "請先按「兩邊都減 " + Math.abs(sug.value) + "」。";
+    if (sug.type === "div") return "請先按「兩邊同除以 −1」。";
+    if (sug.type === "mul") return "請先按「兩邊同乘 −1」。";
+    if (sug.type === "addx") return "請先按「兩邊都加 x」。";
+    return "x 還未單獨留在一邊。";
   }
 
   function gateCheck(run) {
-    if (canCheck(run)) return { ok: true, message: "" };
+    if (isReady(run.sides)) return { ok: true, message: "" };
     return { ok: false, message: notReadyMessage(run) };
+  }
+
+  function lampsUsed(run) {
+    var seen = [];
+    var i;
+    for (i = 0; i < run.steps.length; i += 1) {
+      var lamp = run.steps[i].lamp;
+      if (lamp && seen.indexOf(lamp) === -1) seen.push(lamp);
+    }
+    return seen;
+  }
+
+  function sameSet(a, b) {
+    var i;
+    if (a.length !== b.length) return false;
+    for (i = 0; i < a.length; i += 1) if (b.indexOf(a[i]) === -1) return false;
+    return true;
+  }
+
+  function confirmLamps(run, ids) {
+    var chosen = Array.isArray(ids) ? ids.slice() : [];
+    var i;
+    for (i = 0; i < chosen.length; i += 1) {
+      if (chosen[i] !== "move" && chosen[i] !== "divide") {
+        return { ok: false, applied: false, message: "請只勾選移項或除數。" };
+      }
+    }
+    if (!sameSet(chosen, lampsUsed(run))) {
+      return { ok: false, applied: false, message: "和步驟右邊的燈不一樣。請再看每一行的標籤。" };
+    }
+    run.lampsConfirmed = true;
+    return { ok: true, applied: true, message: "口訣燈核對正確。請填 x，代回原式。" };
   }
 
   function parseStudent(raw) {
@@ -662,25 +516,41 @@
     return expr + " = " + fmtInt(weight(terms, x));
   }
 
+  function penalize(run, label) {
+    run.misses.push(label);
+    if (run.score <= 0) {
+      run.score = 0;
+      return "得分維持 0。";
+    }
+    run.score = Math.max(0, run.score - 10);
+    return "扣 10 分，現為 " + run.score + " 分。";
+  }
+
   function submitCheck(run, raw) {
     var gate = gateCheck(run);
+    var x;
+    var leftText;
+    var rightText;
+    var balanced;
+    var extra;
+    var pen;
     if (!gate.ok) return { ok: false, applied: false, message: gate.message };
-    var x = parseStudent(raw);
+    if (!run.lampsConfirmed) {
+      return { ok: false, applied: false, message: "請先確認你用過的口訣燈。" };
+    }
+    x = parseStudent(raw);
     if (x === null) return { ok: false, applied: false, message: "請輸入整數。負數請寫負號。" };
-    if (Math.abs(x) > 9999) return { ok: false, applied: false, message: "這個數太大了。請再看一次方程。" };
+    if (Math.abs(x) > 9999) return { ok: false, applied: false, message: "這個數太大了。" };
     run.checkTries += 1;
-    var leftText = substSide(run.original.L, x);
-    var rightText = substSide(run.original.R, x);
-    var balanced = weight(run.original.L, x) === weight(run.original.R, x);
+    leftText = substSide(run.original.L, x);
+    rightText = substSide(run.original.R, x);
+    balanced = weight(run.original.L, x) === weight(run.original.R, x);
     if (balanced) {
-      var extra;
       if (run.checkTries === 1) {
         run.bonus = 10;
         run.score += 10;
         extra = "複秤一次成功，獎金 10 分。";
-      } else {
-        extra = "這次左右相等。";
-      }
+      } else extra = "這次左右相等。";
       run.solved = true;
       run.entry = x;
       return {
@@ -693,7 +563,7 @@
         bonus: run.bonus,
       };
     }
-    var pen = penalize(run, "複秤不相等");
+    pen = penalize(run, "複秤不相等");
     return {
       ok: false,
       applied: true,
@@ -706,21 +576,10 @@
   }
 
   function lampHelp(run, id) {
-    if (id === "denom") return "這張訂單沒有分母，這一步可以跳過。";
-    if (id === "expand") return "這張訂單沒有括號，這一步可以跳過。";
-    var requiredDivide = MISSIONS[run.index].divide;
-    if (run.mode === "challenge") {
-      if (id === "collect" || (id === "divide" && !requiredDivide)) return "這張訂單可以跳過這一步。";
-      return "挑戰模式不提示下一步。";
-    }
-    if (id === "move") return "把常數砝碼拖到另一盤，放下時符號會改變。也可以在兩邊同時加上或減去同一個數。";
-    if (id === "collect") return "把同一盤的同類項合併。若合併會直接寫出 x 的值，天平會拒絕。";
+    if (id === "move") return "移項是兩邊同加或同減同一個數。加上相反數之後，按「兩邊一起化簡」，零會同時消去。";
     if (id === "divide") {
-      if (!requiredDivide && divideGoalMet(run.sides)) return "這張訂單可以跳過這一步。";
-      var coeff = singleXCoeff(run.sides);
-      if (coeff === null) return "先把 x 合成一項，再把兩邊同除以它的係數。";
-      if (coeff === 1) return "x 的係數已經是 1，這一步可以跳過。";
-      return "請把兩邊同除以 " + fmtInt(coeff) + "，使 x 的係數變成 1。只除一邊會令天平傾斜。";
+      if (!run.mission.divide) return "這一題不用乘除。";
+      return "除數是兩邊同乘或同除。係數是 −1 時，兩邊同乘 −1，或同除以 −1。";
     }
     return "";
   }
@@ -731,19 +590,147 @@
     return weight(run.sides.L, x) === weight(run.sides.R, x);
   }
 
+  function createRun(index, mode) {
+    var list = missionList(mode);
+    var mission = list[index];
+    var nextId = 1;
+    if (!mission) throw new Error("沒有這一題");
+    function take(pair) {
+      return { id: "t" + nextId++, type: pair[0], coeff: pair[1] };
+    }
+    var sides = {
+      L: mission.L.map(take),
+      R: mission.R.map(take),
+    };
+    var useMode = normalizeMode(mode);
+    return {
+      index: index,
+      mode: useMode,
+      mission: mission,
+      sides: sides,
+      original: cloneSides(sides),
+      nextId: nextId,
+      score: 100,
+      misses: [],
+      history: [],
+      steps: [{ equation: formatEq(sides), lamp: null, note: "原式" }],
+      freshIds: [],
+      lampsConfirmed: false,
+      checkTries: 0,
+      bonus: 0,
+      solved: false,
+      entry: null,
+    };
+  }
+
+  function missionInfo(index, mode) {
+    var list = missionList(mode);
+    var mission = list[index];
+    if (!mission) throw new Error("沒有這一題");
+    return {
+      index: index,
+      number: index + 1,
+      total: list.length,
+      title: mission.title,
+      brief: mission.brief,
+      divide: !!mission.divide,
+      addX: !!mission.addX,
+      mode: normalizeMode(mode),
+    };
+  }
+
+  function lampState(run, id) {
+    var i;
+    var used = false;
+    for (i = 0; i < run.steps.length; i += 1) if (run.steps[i].lamp === id) used = true;
+    if (id === "divide" && !run.mission.divide) return "skip";
+    if (isReady(run.sides) && (id === "move" || used || id === "divide")) return "done";
+    return "need";
+  }
+
+  function view(run) {
+    var info = missionInfo(run.index, run.mode);
+    var sug = suggest(run);
+    var fresh = {};
+    var i;
+    for (i = 0; i < run.freshIds.length; i += 1) fresh[run.freshIds[i]] = true;
+    function tokens(side) {
+      return run.sides[side].map(function (t) {
+        return {
+          id: t.id,
+          type: t.type,
+          side: side,
+          label: tokenLabel(t),
+          neg: t.coeff < 0,
+          fresh: !!fresh[t.id],
+        };
+      });
+    }
+    return {
+      number: info.number,
+      total: info.total,
+      title: info.title,
+      brief: info.brief,
+      mode: run.mode,
+      setLabel: run.mode === "challenge" ? "挑戰" : "練習",
+      score: run.score,
+      motto: MOTTO,
+      equation: formatEq(run.sides),
+      originalEquation: formatEq(run.original),
+      steps: run.steps.map(function (step) {
+        return { equation: step.equation, lamp: step.lamp, note: step.note };
+      }),
+      lampsUsed: lampsUsed(run),
+      lampsConfirmed: !!run.lampsConfirmed,
+      ready: isReady(run.sides),
+      suggest: sug ? { type: sug.type, value: sug.value } : null,
+      tokens: { L: tokens("L"), R: tokens("R") },
+      lamps: [LAMPS.move, LAMPS.divide].map(function (lamp) {
+        return {
+          id: lamp.id,
+          name: lamp.name,
+          detail: lamp.detail,
+          state: lampState(run, lamp.id),
+        };
+      }),
+      actions: listActions(run),
+      canUndo: run.history.length > 0,
+      checkTries: run.checkTries,
+      bonus: run.bonus,
+      solved: !!run.solved,
+    };
+  }
+
+  function resultOf(run) {
+    if (!run.solved) return null;
+    var counts = {};
+    run.misses.forEach(function (label) {
+      counts[label] = (counts[label] || 0) + 1;
+    });
+    return {
+      entry: run.entry,
+      score: run.score,
+      bonus: run.bonus,
+      deductions: Object.keys(counts).map(function (label) {
+        return { label: label, times: counts[label], points: counts[label] * 10 };
+      }),
+    };
+  }
+
   var api = {
-    missionCount: MISSIONS.length,
+    motto: MOTTO,
+    lamps: LAMPS,
+    practiceCount: PRACTICE.length,
+    challengeCount: CHALLENGE.length,
     missionInfo: missionInfo,
     createRun: createRun,
     view: view,
     resultOf: resultOf,
-    moveTerm: moveTerm,
-    addToPans: addToPans,
-    mergeSide: mergeSide,
-    mergeTwo: mergeTwo,
-    divide: divide,
+    applyAction: applyAction,
     undo: undo,
     gateCheck: gateCheck,
+    lampsUsed: lampsUsed,
+    confirmLamps: confirmLamps,
     submitCheck: submitCheck,
     lampHelp: lampHelp,
     isLevel: isLevel,
