@@ -10,7 +10,6 @@
   --pine-dark: #154e49;
   --hint: #fff6e4;
   --hint-line: #e4c98a;
-  --guide: #d97706;
   --ok: #1c7a45;
   --ok-bg: #e7f5ec;
   --bad-bg: #fdeeea;
@@ -206,19 +205,8 @@ main { padding: 18px 0 48px; }
 .action-card h3 { margin-bottom: 2px; }
 .btn-grid { margin-top: 8px; }
 .op-btn { min-height: 52px; font-size: 1.05rem; flex: 1 1 200px; }
-.op-btn.wide { width: 100%; margin-top: 8px; }
-.btn.is-guide {
-  background: var(--hint);
-  border: 2px dashed var(--guide);
-  color: var(--ink);
-  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.16);
-}
-.btn-primary.is-guide {
-  background: var(--pine);
-  color: #fff;
-  border: 2px dashed #f4d48a;
-  box-shadow: 0 0 0 3px rgba(244, 212, 138, 0.45);
-}
+.choice-list { display: grid; gap: 8px; margin-top: 8px; }
+.choice-list .btn { width: 100%; height: auto; min-height: 52px; text-align: left; white-space: normal; line-height: 1.45; }
 .nav-row { margin-top: 12px; }
 .text-btn {
   display: inline-flex;
@@ -263,8 +251,8 @@ input.check-input { font-size: 1.4rem; width: 7rem; text-align: center; }
   text-align: center;
   font-weight: 700;
   line-height: 1.3;
-  background: var(--hint);
-  border: 2px dashed var(--guide);
+  background: #fff;
+  border: 1px solid var(--line);
   border-radius: 12px;
   padding: 6px;
 }
@@ -288,7 +276,7 @@ input.check-input { font-size: 1.4rem; width: 7rem; text-align: center; }
   border-bottom-width: 6px;
   border-radius: 16px 16px 10px 10px;
 }
-.scale.is-sync .pan { border-color: var(--guide); }
+.scale.is-sync .pan { border-color: var(--pine); }
 .pan-name { text-align: center; color: var(--muted); font-size: 0.82rem; font-weight: 700; }
 .tokens {
   display: flex;

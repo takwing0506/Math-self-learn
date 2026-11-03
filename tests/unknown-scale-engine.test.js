@@ -38,16 +38,33 @@ function check(name, fn) {
   console.log("ok", name);
 }
 
+function openRun(run) {
+  let opened = false;
+  E.purpose().choices.forEach((_, index) => {
+    if (E.answerPurpose(run, index).ok) opened = true;
+  });
+  assert.strictEqual(opened, true);
+}
+
 function autoPractice(index) {
   const run = E.createRun(index, "practice");
+  const blocked = E.applyAction(run, { type: "add", value: 1 });
+  assert.strictEqual(blocked.ok, false);
+  openRun(run);
   for (let i = 0; i < 8; i += 1) {
-    const v = E.view(run);
-    if (v.ready) return run;
-    const guided = v.actions.filter((action) => action.guided);
-    assert.strictEqual(guided.length, 1, v.equation);
-    const result = E.applyAction(run, guided[0]);
+    assert.ok(E.view(run).actions.every((action) => !action.guided));
+    assert.strictEqual(E.view(run).suggest, undefined);
+    if (E.gateCheck(run).ok) return run;
+    const step = E.hint(run);
+    assert.ok(step && step.type !== "check", E.view(run).equation);
+    const result = E.applyAction(run, { type: step.type, value: step.value });
     assert.strictEqual(result.ok, true, result.message);
-    assert.strictEqual(E.isLevel(run), true, v.equation);
+    assert.strictEqual(E.isLevel(run), true, E.view(run).equation);
+    if (result.askGoal) {
+      const goal = E.answerGoal(run, !!E.view(run).ready);
+      assert.strictEqual(goal.ok, true);
+      assert.strictEqual(E.view(run).score, 100);
+    }
   }
   assert.fail("stuck at " + E.view(run).equation);
 }
@@ -122,7 +139,10 @@ check("practice guides the additive path and simplifies both sides", () => {
     const view = E.view(run);
     assert.strictEqual(view.equation === "x = " + (item.answer < 0 ? MINUS + Math.abs(item.answer) : item.answer)
       || view.equation === (item.answer < 0 ? MINUS + Math.abs(item.answer) : item.answer) + " = x", true, view.equation);
-    assert.strictEqual(view.suggest.type, "check");
+    assert.strictEqual(E.hint(run).type, "check");
+    assert.strictEqual(view.goalAffirmed, true);
+    assert.ok(view.actions.every((action) => !action.guided));
+    assert.strictEqual(view.suggest, undefined);
     assert.ok(view.steps.every((step) => step.lamp === null || step.lamp === "move"));
     assert.deepStrictEqual(E.lampsUsed(run), ["move"]);
     assert.strictEqual(view.lamps.find((lamp) => lamp.id === "divide").state, "skip");
@@ -133,26 +153,34 @@ check("practice guides the additive path and simplifies both sides", () => {
 
 check("x−9=4 adds on both pans then cancels zeros together", () => {
   const run = E.createRun(1, "practice");
-  assert.strictEqual(E.view(run).suggest.type, "add");
-  assert.strictEqual(E.view(run).suggest.value, 9);
-  const guided = E.view(run).actions.filter((action) => action.guided);
-  assert.strictEqual(guided.length, 1);
-  assert.strictEqual(guided[0].label, "兩邊都加 9");
+  assert.strictEqual(E.hint(run).type, "add");
+  assert.strictEqual(E.hint(run).value, 9);
+  assert.ok(E.view(run).actions.every((action) => !action.guided));
+  assert.strictEqual(E.applyAction(run, { type: "add", value: 9 }).ok, false);
+  openRun(run);
   const added = E.applyAction(run, { type: "add", value: 9 });
   assert.strictEqual(added.ok, true);
+  assert.strictEqual(added.askGoal, false);
   assert.strictEqual(added.banner, "兩邊 +9");
   assert.strictEqual(E.view(run).equation, "x " + MINUS + " 9 + 9 = 4 + 9");
   const freshL = E.view(run).tokens.L.filter((token) => token.fresh).map((token) => token.label);
   const freshR = E.view(run).tokens.R.filter((token) => token.fresh).map((token) => token.label);
   assert.deepStrictEqual(freshL, ["9"]);
   assert.deepStrictEqual(freshR, ["9"]);
-  assert.strictEqual(E.view(run).actions.find((action) => action.guided).label, "兩邊一起化簡");
+  assert.ok(E.view(run).actions.some((action) => action.label === "兩邊一起化簡"));
   const simplified = E.applyAction(run, { type: "simplify" });
   assert.strictEqual(simplified.ok, true);
+  assert.strictEqual(simplified.askGoal, true);
   assert.strictEqual(E.view(run).equation, "x = 13");
   assert.strictEqual(E.view(run).ready, true);
+  assert.strictEqual(E.gateCheck(run).ok, false);
+  const notYet = E.answerGoal(run, false);
+  assert.strictEqual(notYet.affirmed, false);
+  assert.strictEqual(E.gateCheck(run).ok, false);
+  assert.strictEqual(E.view(run).score, 100);
+  assert.strictEqual(E.answerGoal(run, true).affirmed, true);
   assert.ok(E.view(run).tokens.R.some((token) => token.label === "13"));
-  assert.ok(!JSON.stringify(E.view(run)).includes("？"));
+  assert.ok(!E.view(run).equation.includes("？"));
   assert.strictEqual(E.view(run).steps[1].lamp, "move");
   assert.strictEqual(E.view(run).steps[1].note, "兩邊都加 9");
   assert.strictEqual(E.view(run).steps[2].lamp, "move");
@@ -163,12 +191,17 @@ check("x−9=4 adds on both pans then cancels zeros together", () => {
 
 check("challenge A constant first", () => {
   const run = E.createRun(0, "challenge");
-  assert.strictEqual(E.view(run).suggest, null);
-  assert.ok(E.view(run).actions.every((action) => action.guided === false));
+  assert.strictEqual(E.view(run).look, "");
+  assert.ok(E.view(run).actions.every((action) => !action.guided));
+  openRun(run);
   E.applyAction(run, { type: "add", value: -4 });
   assert.strictEqual(E.view(run).equation, "4 + x " + MINUS + " 4 = 1 " + MINUS + " 4");
-  E.applyAction(run, { type: "simplify" });
+  const simplified = E.applyAction(run, { type: "simplify" });
+  assert.strictEqual(simplified.askGoal, true);
   assert.strictEqual(E.view(run).equation, "x = " + MINUS + "3");
+  const earlyYes = E.answerGoal(run, false);
+  assert.strictEqual(earlyYes.affirmed, false);
+  assert.strictEqual(E.answerGoal(run, true).affirmed, true);
   finish(run, -3, ["move"]);
 });
 
@@ -180,6 +213,7 @@ check("challenge B uses divide or multiply by −1, never moving −x", () => {
   assert.ok(labels.indexOf("兩邊都加 x") === -1);
   assert.strictEqual(E.view(run).lamps.find((lamp) => lamp.id === "divide").state, "need");
   assert.ok(E.lampHelp(run, "divide").indexOf("同乘") !== -1);
+  openRun(run);
   const refused = E.applyAction(run, { type: "addx", value: 1 });
   assert.strictEqual(refused.ok, false);
   E.applyAction(run, { type: "add", value: -6 });
@@ -190,12 +224,15 @@ check("challenge B uses divide or multiply by −1, never moving −x", () => {
   assert.strictEqual(divided.ok, true);
   assert.strictEqual(divided.banner, "兩邊 ÷ −1");
   assert.strictEqual(E.view(run).equation, "x = " + MINUS + "4");
+  assert.strictEqual(divided.askGoal, true);
+  assert.strictEqual(E.answerGoal(run, true).affirmed, true);
   assert.deepStrictEqual(E.lampsUsed(run), ["move", "divide"]);
   const onlyMove = E.confirmLamps(run, ["move"]);
   assert.strictEqual(onlyMove.ok, false);
   finish(run, -4, ["move", "divide"]);
 
   const other = E.createRun(1, "challenge");
+  openRun(other);
   E.applyAction(other, { type: "mul", value: -1 });
   assert.strictEqual(E.view(other).equation, "x " + MINUS + " 6 = " + MINUS + "10");
   E.applyAction(other, { type: "add", value: 6 });
@@ -208,6 +245,7 @@ check("challenge C keeps −x in the middle and stays additive", () => {
   const run = E.createRun(2, "challenge");
   assert.strictEqual(E.view(run).lamps.find((lamp) => lamp.id === "divide").state, "skip");
   assert.ok(E.view(run).actions.some((action) => action.label === "兩邊都加 x"));
+  openRun(run);
   const noDivide = E.applyAction(run, { type: "div", value: -1 });
   assert.strictEqual(noDivide.ok, false);
   E.applyAction(run, { type: "addx", value: 1 });
@@ -217,6 +255,7 @@ check("challenge C keeps −x in the middle and stays additive", () => {
   E.applyAction(run, { type: "add", value: -4 });
   E.applyAction(run, { type: "simplify" });
   assert.strictEqual(E.view(run).equation, "5 = x");
+  assert.strictEqual(E.answerGoal(run, true).affirmed, true);
   assert.deepStrictEqual(E.lampsUsed(run), ["move"]);
   finish(run, 5, ["move"]);
 });
@@ -276,6 +315,8 @@ check("student-facing sources drop the old move-across copy", () => {
   assert.strictEqual(blob.indexOf("拖到"), -1);
   assert.strictEqual(blob.indexOf("moveTerm"), -1);
   assert.strictEqual(blob.indexOf("pointerdown"), -1);
+  assert.strictEqual(blob.indexOf("黃虛線"), -1);
+  assert.strictEqual(blob.indexOf("is-guide"), -1);
   assert.strictEqual(typeof E.moveTerm, "undefined");
 });
 

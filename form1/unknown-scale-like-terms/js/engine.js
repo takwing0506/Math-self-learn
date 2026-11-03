@@ -195,9 +195,9 @@
   }
 
   function setLabel(mode) {
-    if (mode === "challenge") return "挑戰";
+    if (mode === "challenge") return "挑戰模式";
     if (mode === "trap") return "陷阱";
-    return "練習";
+    return "引導模式";
   }
 
   function fmtInt(n) {
@@ -414,43 +414,40 @@
   }
 
   function formAdvice(sides) {
-    var k;
     var eq;
     if (isSolvedForm(sides)) return { ok: true, message: "" };
+    eq = formatEq(sides, false);
     if (hasPair(sides.L) || hasPair(sides.R)) {
-      return { ok: false, message: "還有同色的同類項未合併。請先把同色的項拖在一起。" };
+      return { ok: false, message: "還沒有達到目標。現在是 " + eq + "。一邊要只剩未知箱 x，另一邊只剩一個數。" };
     }
     if (xTerms(sides.L).length && xTerms(sides.R).length) {
-      return {
-        ok: false,
-        message: "兩邊都還有未知箱。請把一邊的 x 項拖到另一盤；原盤拿走這一項，另一盤放下相反項。這一步等於兩邊同加或同減。",
-      };
+      return { ok: false, message: "還沒有達到目標。現在是 " + eq + "。未知箱還在兩邊，尚未變成一邊只剩 x。" };
     }
     if (constantBesideX(sides)) {
-      return { ok: false, message: "未知箱這一邊仍有砝碼。請把砝碼拖到另一盤，另一盤會留下相反數。" };
+      return { ok: false, message: "還沒有達到目標。現在是 " + eq + "。有未知箱的那邊仍有砝碼。" };
     }
-    k = loneCoeff(sides);
-    if (k !== null && k !== 1) {
-      eq = formatEq(sides, false);
-      if (k === -1) {
-        return {
-          ok: false,
-          message: "還未是 x＝數。現在是 " + eq + "。請按「兩邊同除以 −1」或「兩邊同乘 −1」。−x＝4 這種式子不能按完成。乘除不要用拖曳。",
-        };
-      }
-      if (k < 0) {
-        return {
-          ok: false,
-          message: "還未是 x＝數。現在是 " + eq + "。請按「兩邊同除以 " + fmtInt(k) + "」。負係數可以改用「兩邊同乘 −1」，再繼續除。乘除不要用拖曳。",
-        };
-      }
+    if (loneCoeff(sides) !== null && loneCoeff(sides) !== 1) {
       return {
         ok: false,
-        message: "還未是 x＝數 或 數＝x。現在是 " + eq + "。請按「兩邊同除以 " + fmtInt(k) + "」。像 2x＝10 或 10＝2x，都不能按完成。−x＝4 也不可以。乘除不要用拖曳。",
+        message: "還沒有達到目標。現在是 " + eq + "。未知箱的係數還不是 1。像 2x＝10、10＝2x、−x＝4 都不可以完成。乘除請用按鈕，自己決定。",
       };
     }
-    return { ok: false, message: "還未化成 x＝數 或 數＝x。" };
+    return { ok: false, message: "還沒有達到目標。一邊要只剩未知箱 x，另一邊只剩一個數。" };
   }
+
+  var PURPOSE = {
+    ask: "我們想把方程變成甚麼樣子？",
+    choices: [
+      "兩邊的數字一樣大就好。",
+      "先把未知箱乘開。",
+      "一邊只剩未知箱（x），另一邊只剩一個數。",
+      "把所有項都刪掉。",
+    ],
+    answer: 2,
+    right: "對。目標是一邊只剩 x，另一邊只剩一個數。寫成 x＝一個數，或一個數＝x，都算達到。",
+    wrong: "還不是。再想：解完之後，未知箱應該單獨留在一邊，另一邊只剩一個數。",
+  };
+  var GOAL_ASK = "有達到目標嗎？";
 
   function termValue(t, x) {
     return t.type === "x" ? t.coeff * x : t.coeff;
@@ -519,14 +516,15 @@
     return null;
   }
 
-  function coachLine(guide) {
-    if (!guide) return "";
-    if (guide.type === "merge") return "黃虛線：把同色的兩項拖在一起。";
-    if (guide.type === "move" && guide.kind === "x") return "黃虛線：把這隻未知箱拖到另一盤。";
-    if (guide.type === "move") return "黃虛線：把這個砝碼拖到另一盤。";
-    if (guide.type === "div") return "黃虛線：按「兩邊同除以 " + fmtInt(guide.value) + "」。";
-    if (guide.type === "mul") return "黃虛線：按「兩邊同乘 " + fmtInt(guide.value) + "」。";
-    if (guide.type === "finish") return "黃虛線：按完成，再代入原式。";
+  function lookQuestion(run) {
+    var step;
+    if (run.mode !== "practice" || !run.goalSet) return "";
+    step = hint(run);
+    if (!step || step.type === "finish") return "現在是不是一邊只剩未知箱，另一邊只剩一個數？";
+    if (step.type === "merge") return "這一盤有沒有兩個同色的項？";
+    if (step.type === "move" && step.kind === "x") return "是不是兩邊都還有未知箱？";
+    if (step.type === "move") return "有未知箱的那邊，是否還有砝碼？";
+    if (step.type === "div" || step.type === "mul") return "未知箱的係數是不是 1？";
     return "";
   }
 
@@ -587,8 +585,8 @@
     for (i = 0; i < now.length; i += 1) if (!prev[now[i]]) fresh.push(now[i]);
     run.freshIds = fresh;
     run.freshLamp = lamp;
+    run.goalAffirmed = false;
     message = note + "。" + (extra || "") + "現在是 " + eq + "。";
-    if (isSolvedForm(run.sides)) message += "可以按完成，再代入原式。";
     return {
       ok: true,
       applied: true,
@@ -598,6 +596,8 @@
       lamp: lamp,
       checkLines: [],
       shakeIds: [],
+      askGoal: !!(run.goalSet && (note.indexOf("合併") !== -1 || isSolvedForm(run.sides))),
+      reached: isSolvedForm(run.sides),
     };
   }
 
@@ -720,8 +720,16 @@
     return commit(run, next, "move", plan.note, plan.banner, plan.narration);
   }
 
+  function needGoal(run) {
+    if (!run.goalSet) return bad("請先回答：我們想把方程變成甚麼樣子？");
+    return null;
+  }
+
   function applyDrop(run, sourceId, target) {
-    var kind = classifyDrop(run, sourceId, target);
+    var blocked = needGoal(run);
+    var kind;
+    if (blocked) return blocked;
+    kind = classifyDrop(run, sourceId, target);
     if (kind.kind === "merge") return mergeTerms(run, sourceId, target.id);
     if (kind.kind === "move") return moveAcross(run, sourceId);
     if (kind.kind === "refuse") {
@@ -733,19 +741,21 @@
   }
 
   function applyScale(run, action) {
+    var blocked = needGoal(run);
     var allowed;
     var match;
     var i;
     var factor;
     var next;
     var note;
+    if (blocked) return blocked;
     if (!action || (action.type !== "mul" && action.type !== "div")) return bad("請按乘除按鈕。");
     allowed = scaleActions(run);
     match = null;
     for (i = 0; i < allowed.length; i += 1) {
       if (allowed[i].type === action.type && allowed[i].value === action.value) match = allowed[i];
     }
-    if (!match) return bad("現在還不能做這個乘除。請先合併同類項，並把 x 放到同一邊。乘除不要用拖曳。");
+    if (!match) return bad("現在還不能做這個乘除。目標仍是一邊只剩未知箱，另一邊只剩一個數。乘除不要用拖曳。");
     factor = action.value;
     next = { L: [], R: [] };
     ["L", "R"].forEach(function (name) {
@@ -772,12 +782,40 @@
     run.freshIds = [];
     run.freshLamp = "";
     run.solved = false;
-    return { ok: true, applied: true, banner: "", message: "已返回上一步。", checkLines: [], shakeIds: [] };
+    if (!isSolvedForm(run.sides)) run.goalAffirmed = false;
+    return { ok: true, applied: true, banner: "", message: "已返回上一步。", checkLines: [], shakeIds: [], askGoal: false };
+  }
+
+  function answerPurpose(run, choice) {
+    if (Number(choice) !== PURPOSE.answer) return { ok: false, message: PURPOSE.wrong };
+    run.goalSet = true;
+    return { ok: true, message: PURPOSE.right };
+  }
+
+  function answerGoal(run, saidYes) {
+    var yes = !!saidYes;
+    var reached = isSolvedForm(run.sides);
+    if (!run.goalSet) return { ok: false, message: "請先回答：我們想把方程變成甚麼樣子？" };
+    if (!reached && yes) {
+      return { ok: true, reached: false, affirmed: false, message: "還沒有。一邊仍然不是只剩未知箱，或另一邊不是只剩一個數。請再看方程，自己選下一步。" };
+    }
+    if (!reached && !yes) {
+      return { ok: true, reached: false, affirmed: false, message: "好。目標尚未達到，請繼續自己選下一步。" };
+    }
+    if (yes) {
+      run.goalAffirmed = true;
+      return { ok: true, reached: true, affirmed: true, message: "對。一邊只剩 x，另一邊只剩一個數。可以按完成，再代入原式。" };
+    }
+    return { ok: true, reached: true, affirmed: false, message: "請再觀察現在的方程。若一邊只剩未知箱、另一邊只剩一個數，就是達到目標。再確認一次。" };
   }
 
   function finishGate(run) {
-    var advice = formAdvice(run.sides);
-    return { ok: advice.ok, message: advice.message };
+    var advice;
+    if (!run.goalSet) return { ok: false, message: "請先回答：我們想把方程變成甚麼樣子？" };
+    advice = formAdvice(run.sides);
+    if (!advice.ok) return advice;
+    if (!run.goalAffirmed) return { ok: false, message: "請先回答：有達到目標嗎？" };
+    return { ok: true, message: "" };
   }
 
   function lampsUsed(run) {
@@ -943,12 +981,10 @@
     var options = opts || {};
     var preview = options.preview && options.preview.ok ? options.preview : null;
     var sides = preview ? preview.sides : run.sides;
-    var guide = null;
     var fresh = {};
     var i;
     var info;
     var actions;
-    if (run.mode === "practice" && !preview && !options.leavingId) guide = hint(run);
     for (i = 0; i < run.freshIds.length; i += 1) fresh[run.freshIds[i]] = true;
     function tokens(side) {
       return sides[side].map(function (t) {
@@ -960,7 +996,6 @@
           labelOne: explicitLabel(t),
           neg: t.coeff < 0,
           fresh: !!fresh[t.id] || t.id === "pv",
-          guided: !!(guide && ((guide.type === "merge" && guide.ids.indexOf(t.id) !== -1) || (guide.type === "move" && guide.id === t.id))),
           leaving: options.leavingId === t.id,
         };
       });
@@ -972,7 +1007,6 @@
         value: action.value,
         group: action.group,
         label: action.label,
-        guided: !!(guide && guide.type === action.type && guide.value === action.value),
       };
     });
     return {
@@ -995,9 +1029,9 @@
       }),
       lampsUsed: lampsUsed(run),
       ready: isSolvedForm(run.sides),
-      guide: guide,
-      finishGuided: !!(guide && guide.type === "finish"),
-      coach: coachLine(guide),
+      goalSet: !!run.goalSet,
+      goalAffirmed: !!run.goalAffirmed,
+      look: preview ? "" : lookQuestion(run),
       tokens: { L: tokens("L"), R: tokens("R") },
       lamps: [LAMPS.merge, LAMPS.move, LAMPS.divide].map(function (lamp) {
         var state = lampState(run, lamp.id);
@@ -1008,7 +1042,6 @@
           detail: lamp.detail,
           title: note || lamp.detail,
           state: state,
-          pulse: run.freshLamp === lamp.id && state === "done",
         };
       }),
       actions: actions,
@@ -1058,6 +1091,8 @@
       freshIds: [],
       freshLamp: "",
       alarm: "",
+      goalSet: false,
+      goalAffirmed: false,
       checkTries: 0,
       bonus: 0,
       solved: false,
@@ -1266,7 +1301,12 @@ function advanceWarmup(session) {
     createRun: createRun,
     view: view,
     hint: hint,
-    coachLine: coachLine,
+    purpose: function () {
+      return { ask: PURPOSE.ask, choices: PURPOSE.choices.slice() };
+    },
+    goalAsk: GOAL_ASK,
+    answerPurpose: answerPurpose,
+    answerGoal: answerGoal,
     planMove: planMove,
     needsMoveInquiry: needsMoveInquiry,
     moveInquiry: moveInquiry,

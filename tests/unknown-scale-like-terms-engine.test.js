@@ -48,8 +48,19 @@ function leaks(text, answer) {
   );
 }
 
+function openRun(run) {
+  let opened = false;
+  E.purpose().choices.forEach((_, index) => {
+    if (E.answerPurpose(run, index).ok) opened = true;
+  });
+  assert.strictEqual(opened, true);
+}
+
 function auto(run) {
+  openRun(run);
   for (let guard = 0; guard < 16; guard += 1) {
+    assert.ok((E.view(run).actions || []).every((action) => !action.guided));
+    assert.ok((E.view(run).tokens.L.concat(E.view(run).tokens.R)).every((token) => !token.guided));
     if (E.finishGate(run).ok) return E.view(run);
     const h = E.hint(run);
     assert.ok(h, E.view(run).equation);
@@ -60,6 +71,11 @@ function auto(run) {
     else result = E.applyScale(run, { type: h.type, value: h.value });
     assert.strictEqual(result.ok, true, (result.message || "") + " / " + E.view(run).equation);
     assert.strictEqual(E.isLevel(run), true, E.view(run).equation);
+    if (result.askGoal) {
+      const goal = E.answerGoal(run, !!E.view(run).ready);
+      assert.strictEqual(goal.ok, true);
+      assert.strictEqual(E.view(run).score, 100);
+    }
   }
   assert.fail("stuck " + E.view(run).equation);
 }
@@ -172,10 +188,12 @@ check("3x − x reveals the coefficient 1 and merges to 2x", () => {
   const view = E.view(run);
   assert.strictEqual(view.unitCoach, "3x " + MINUS + " x 寫成 3x " + MINUS + " 1x，係數 1 先看得見。");
   assert.strictEqual(view.equationOne, "3x " + MINUS + " 1x = 8");
-  assert.strictEqual(view.guide.type, "merge");
-  assert.ok(view.tokens.L.every((item) => item.guided));
+  assert.strictEqual(view.guide, undefined);
+  assert.ok(view.tokens.L.every((item) => !item.guided));
   assert.strictEqual(view.actions.length, 0);
-  assert.ok(view.coach.indexOf("同色") !== -1);
+  assert.strictEqual(view.look, "");
+  openRun(run);
+  assert.ok(E.view(run).look.indexOf("同色") !== -1);
   const before = run.nextId;
   const plan = E.planMove(run, view.tokens.L[0].id);
   assert.strictEqual(plan.ok, true);
@@ -186,17 +204,26 @@ check("3x − x reveals the coefficient 1 and merges to 2x", () => {
   assert.strictEqual(E.view(run).equation, "2x = 8");
   assert.strictEqual(E.view(run).steps[1].lamp, "merge");
   assert.strictEqual(E.view(run).steps[1].note, "把同類項合併：3x " + MINUS + " x = 2x");
-  assert.strictEqual(E.view(run).guide.type, "div");
-  assert.strictEqual(E.view(run).guide.value, 2);
+  assert.strictEqual(merged.askGoal, true);
+  assert.strictEqual(E.hint(run).type, "div");
+  assert.strictEqual(E.hint(run).value, 2);
   assert.strictEqual(E.view(run).actions[0].label, "兩邊同除以 2");
-  assert.strictEqual(E.view(run).actions[0].guided, true);
+  assert.strictEqual(E.view(run).actions[0].guided, undefined);
+  const tooSoon = E.answerGoal(run, true);
+  assert.strictEqual(tooSoon.affirmed, false);
+  assert.strictEqual(E.view(run).score, 100);
   const early = E.finishGate(run);
   assert.strictEqual(early.ok, false);
   assert.ok(early.message.indexOf("2x = 8") !== -1);
-  assert.ok(early.message.indexOf("兩邊同除以 2") !== -1);
+  assert.ok(early.message.indexOf("還沒有達到目標") !== -1);
   assert.ok(early.message.indexOf("2x＝10") !== -1);
   assert.ok(early.message.indexOf(MINUS + "x＝4") !== -1);
-  E.applyScale(run, { type: "div", value: 2 });
+  assert.strictEqual(early.message.indexOf("請按「兩邊同除以 2」"), -1);
+  const divided = E.applyScale(run, { type: "div", value: 2 });
+  assert.strictEqual(divided.askGoal, true);
+  assert.strictEqual(E.finishGate(run).ok, false);
+  assert.strictEqual(E.answerGoal(run, true).affirmed, true);
+  assert.strictEqual(E.finishGate(run).ok, true);
   assert.strictEqual(E.view(run).equation, "x = 4");
   assert.strictEqual(E.readSolution(run), 4);
 });
@@ -226,6 +253,7 @@ check("dragging +4x places −4x and asks before the model changes", () => {
     if (step === "wonder") assert.ok(text.indexOf("兩邊同加或同減") !== -1);
     assert.strictEqual(E.gradeInquiry(plan, step, (pick + 1) % 4).ok, false);
   });
+  openRun(run);
   const constant = token(run, "L", "4");
   assert.strictEqual(E.needsMoveInquiry(E.planMove(run, constant.id), false), false);
   const moved = E.applyDrop(run, id, { kind: "pan", side: "L" });
@@ -239,6 +267,7 @@ check("dragging +4x places −4x and asks before the model changes", () => {
 
 check("unlike colours are refused and the lamp turns red", () => {
   const run = E.createRun(0, "trap");
+  openRun(run);
   const box = token(run, "L", "3x");
   const weight = token(run, "L", "5");
   const before = E.view(run).equation;
@@ -260,6 +289,7 @@ check("unlike colours are refused and the lamp turns red", () => {
 
 check("trap 3 merges 5x with x and does not merge the weight", () => {
   const run = E.createRun(2, "trap");
+  openRun(run);
   const five = token(run, "L", "5x");
   const one = token(run, "L", "x");
   const weight = token(run, "L", MINUS + "3");
@@ -283,26 +313,29 @@ check("finish rejects 2x = 10, 10 = 2x, and −x = 4", () => {
   }
   const two = advice([["x", 2]], [["n", 10]]);
   assert.strictEqual(two.ok, false);
-  assert.ok(two.message.indexOf("兩邊同除以 2") !== -1);
+  assert.ok(two.message.indexOf("還沒有達到目標") !== -1);
   assert.ok(two.message.indexOf("2x＝10") !== -1);
+  assert.strictEqual(two.message.indexOf("請按"), -1);
   const flipped = advice([["n", 10]], [["x", 2]]);
   assert.strictEqual(flipped.ok, false);
   assert.ok(flipped.message.indexOf("10 = 2x") !== -1 || flipped.message.indexOf("10＝2x") !== -1);
   const neg = advice([["x", -1]], [["n", 4]]);
   assert.strictEqual(neg.ok, false);
-  assert.ok(neg.message.indexOf("兩邊同除以 " + MINUS + "1") !== -1);
   assert.ok(neg.message.indexOf(MINUS + "x＝4") !== -1);
+  assert.strictEqual(neg.message.indexOf("請按"), -1);
   assert.strictEqual(advice([["x", 1]], [["n", 4]]).ok, true);
   assert.strictEqual(advice([["n", 4]], [["x", 1]]).ok, true);
   const negFour = advice([["x", -4]], [["n", 4]]);
   assert.strictEqual(negFour.ok, false);
-  assert.ok(negFour.message.indexOf("兩邊同除以 " + MINUS + "4") !== -1);
+  assert.ok(negFour.message.indexOf(MINUS + "4x = 4") !== -1);
+  assert.ok(negFour.message.indexOf("係數還不是 1") !== -1);
 });
 
 check("challenge 1 reaches −1 by −4x = 4 and dividing by −4", () => {
   const run = E.createRun(0, "challenge");
-  assert.strictEqual(E.view(run).guide, null);
-  assert.ok(E.view(run).actions.every((action) => action.guided === false));
+  assert.strictEqual(E.view(run).look, "");
+  assert.ok(E.view(run).actions.every((action) => !action.guided));
+  openRun(run);
   const nine = token(run, "R", "9x");
   const moved = E.applyDrop(run, nine.id, { kind: "pan", side: "L" });
   assert.strictEqual(moved.ok, true);
@@ -315,6 +348,7 @@ check("challenge 1 reaches −1 by −4x = 4 and dividing by −4", () => {
   const gate = E.finishGate(run);
   assert.strictEqual(gate.ok, false);
   assert.ok(gate.message.indexOf(MINUS + "4x = 4") !== -1);
+  assert.ok(gate.message.indexOf("還沒有達到目標") !== -1);
   const button = E.view(run).actions.find((action) => action.type === "div");
   assert.strictEqual(button.label, "兩邊同除以 " + MINUS + "4");
   assert.ok(E.view(run).actions.some((action) => action.label === "兩邊同乘 " + MINUS + "1"));
@@ -329,6 +363,7 @@ check("challenge 1 reaches −1 by −4x = 4 and dividing by −4", () => {
 
 check("multiplying by −1 is an alternative on the negative coefficient", () => {
   const run = E.createRun(0, "challenge");
+  openRun(run);
   const nine = token(run, "R", "9x");
   E.applyDrop(run, nine.id, { kind: "pan", side: "L" });
   const left = E.view(run).tokens.L;
@@ -344,10 +379,11 @@ check("multiplying by −1 is an alternative on the negative coefficient", () =>
 check("practice guides only practice, and every set solves to the locked answer", () => {
   PRACTICE.forEach((item, index) => {
     const run = E.createRun(index, "practice");
-    assert.ok(E.view(run).guide);
+    assert.strictEqual(E.view(run).look, "");
     auto(run);
     assert.strictEqual(E.readSolution(run), item.answer, item.eq);
-    assert.strictEqual(E.view(run).guide.type, "finish");
+    assert.strictEqual(E.hint(run).type, "finish");
+    assert.strictEqual(E.view(run).goalAffirmed, true);
     assert.strictEqual(E.view(run).ready, true);
     const hit = E.submitCheck(run, shown(item.answer));
     assert.strictEqual(hit.ok, true, hit.message);
@@ -356,13 +392,13 @@ check("practice guides only practice, and every set solves to the locked answer"
   });
   TRAP.forEach((item, index) => {
     const run = E.createRun(index, "trap");
-    assert.strictEqual(E.view(run).guide, null);
+    assert.strictEqual(E.view(run).look, "");
     auto(run);
     assert.strictEqual(E.readSolution(run), item.answer, item.eq);
   });
   CHALLENGE.forEach((item, index) => {
     const run = E.createRun(index, "challenge");
-    assert.strictEqual(E.view(run).guide, null);
+    assert.strictEqual(E.view(run).look, "");
     auto(run);
     assert.strictEqual(E.readSolution(run), item.answer, item.eq + " -> " + E.view(run).equation);
     assert.strictEqual(E.isLevel(run), true);
@@ -377,9 +413,14 @@ check("merge can light more than once, and divide is not a drag", () => {
   assert.ok(E.view(run).steps.some((step) => step.lamp === "move" && step.note.indexOf("兩邊同") === 0));
   assert.ok(E.view(run).steps.some((step) => step.lamp === "divide"));
   const early = E.createRun(0, "practice");
+  const blocked = E.applyScale(early, { type: "div", value: 2 });
+  assert.strictEqual(blocked.ok, false);
+  assert.ok(blocked.message.indexOf("我們想把方程變成甚麼樣子") !== -1);
+  openRun(early);
   const refused = E.applyScale(early, { type: "div", value: 2 });
   assert.strictEqual(refused.ok, false);
-  assert.ok(refused.message.indexOf("不要用拖曳") !== -1 || refused.message.indexOf("乘除") !== -1);
+  assert.ok(refused.message.indexOf("一邊只剩未知箱") !== -1);
+  assert.ok(refused.message.indexOf("乘除不要用拖曳") !== -1);
 });
 
 check("wrong substitution deducts 10 and undo does not refund it", () => {
@@ -427,6 +468,7 @@ check("parse rejects blanks without spending a try", () => {
 
 check("undo restores the equation and dropping on the same pan does nothing", () => {
   const run = E.createRun(0, "practice");
+  openRun(run);
   const ids = E.view(run).tokens.L.map((item) => item.id);
   E.applyDrop(run, ids[0], { kind: "term", id: ids[1] });
   assert.strictEqual(E.view(run).equation, "2x = 8");
@@ -450,6 +492,8 @@ check("consolidate prompt and student-facing sources", () => {
   ];
   const blob = files.map((file) => fs.readFileSync(path.join(__dirname, "..", file), "utf8")).join("\n");
   assert.strictEqual(blob.indexOf(FORBIDDEN), -1);
+  assert.strictEqual(blob.indexOf("黃虛線"), -1);
+  assert.strictEqual(blob.indexOf("is-guide"), -1);
   assert.ok(blob.indexOf("unknown-scale-like-terms/") !== -1);
   assert.ok(blob.indexOf("unknown-scale/") !== -1);
   assert.ok(fs.readFileSync(path.join(__dirname, "..", "form1/unknown-scale/js/engine.js"), "utf8").indexOf("pointerdown") === -1);

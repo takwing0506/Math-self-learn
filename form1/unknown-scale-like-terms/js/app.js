@@ -24,6 +24,7 @@
   var checkView = null;
   var focusCheck = false;
   var reflect = { merge: null, sign: null };
+  var askingGoal = false;
   var press = null;
   var fromPointer = false;
   var pointerAt = 0;
@@ -74,9 +75,9 @@
     return Engine.practiceCount;
   }
   function modeName(name) {
-    if (name === "challenge") return "挑戰";
+    if (name === "challenge") return "挑戰模式";
     if (name === "trap") return "陷阱";
-    return "練習";
+    return "引導模式";
   }
 
   function shell(body) {
@@ -122,7 +123,6 @@
     var cls = ["token", t.type === "x" ? "token-x" : "token-w"];
     if (t.neg) cls.push("neg");
     if (t.fresh) cls.push("arrive");
-    if (t.guided) cls.push("is-guide");
     if (t.leaving) cls.push("is-leaving");
     if (selectedId === t.id) cls.push("is-selected");
     if (shakeIds.indexOf(t.id) !== -1) cls.push("shake");
@@ -167,7 +167,7 @@
   }
   function lampButtons(v) {
     return '<div class="lamps">' + v.lamps.map(function (lamp) {
-      var cls = "lamp " + lamp.state + (lamp.pulse ? " pulse" : "");
+      var cls = "lamp " + lamp.state;
       return '<button type="button" class="' + cls + '" data-act="lamp" data-lamp="' + lamp.id + '" title="' + esc(lamp.title || lamp.detail) + '">' +
         "<b>" + esc(lamp.name) + "</b><small>" + esc(lamp.detail) + "</small></button>";
     }).join("") + "</div>";
@@ -190,7 +190,7 @@
       "</ul>" +
       '<div class="lamps" aria-hidden="true"><span class="lamp idle">合併</span><span class="lamp idle">移項</span><span class="lamp idle">除數</span></div>' +
       '<p class="fine">每題由 100 分起算。代入錯扣 10 分，最低 0 分。第一次代入就對，另加 10 分。熱身辨認錯亦扣 10 分。</p>' +
-      '<p class="fine">練習有黃虛線。陷阱和挑戰沒有。</p>' +
+      '<p class="fine">每題先問目標。化簡之後再問有沒有達到。引導模式只會用文字問句。</p>' +
       '<div class="btn-row">' + primary + "</div>" +
       '<p class="fine">上一章：<a href="../unknown-scale/">天平工房 · 第一章</a></p>' +
       "</section>"
@@ -217,12 +217,12 @@
       '<section class="card" data-screen="hub">' +
       mottoHtml() +
       "<h2>觀察完成</h2>" +
-      '<p class="lead">可以先辨認同類項，也可以直接做題。練習有黃虛線，陷阱和挑戰沒有。</p>' +
+      '<p class="lead">可以先辨認同類項，也可以直接做題。引導模式和挑戰模式都要自己選下一步。</p>' +
       '<div class="btn-row">' +
       '<button type="button" class="btn btn-primary" data-act="enter" data-mode="warmup">熱身：可／不可合併（4 題）</button>' +
-      '<button type="button" class="btn btn-ghost" data-act="enter" data-mode="practice">練習（5 題）</button>' +
+      '<button type="button" class="btn btn-ghost" data-act="enter" data-mode="practice">引導模式（5 題）</button>' +
       '<button type="button" class="btn btn-ghost" data-act="enter" data-mode="trap">陷阱（3 題）</button>' +
-      '<button type="button" class="btn btn-ghost" data-act="enter" data-mode="challenge">挑戰（3 題）</button>' +
+      '<button type="button" class="btn btn-ghost" data-act="enter" data-mode="challenge">挑戰模式（3 題）</button>' +
       "</div>" +
       '<button type="button" class="text-btn" data-act="review-entry">再看一次對比</button>' +
       '<button type="button" class="text-btn" data-act="reset-move">下次拖未知箱時，再問三問</button>' +
@@ -287,14 +287,13 @@
     var mid = shownBanner
       ? '<div class="sync-label">' + esc(shownBanner) + "</div>"
       : '<div class="sync-label equals" aria-hidden="true">＝</div>';
-    var status = fx ? fx.plan.narration : v.ready ? "x 已經單獨在一邊。可以按完成。" : "天平保持平衡。";
-    var cls = "scale" + (settle || fx ? " is-sync" : "") + (fx ? " is-locked" : "");
+    var status = fx ? fx.plan.narration : v.ready ? "一邊只剩未知箱，另一邊只剩一個數。" : "天平保持平衡。";
+    var cls = "scale" + (settle || fx ? " is-sync" : "") + (fx || !v.goalSet || askingGoal ? " is-locked" : "");
     function pan(side) {
-      var guided = v.guide && v.guide.type === "move" && v.guide.to === side ? " is-guide" : "";
       var tokens = v.tokens[side];
       var inner = tokens.length ? tokens.map(function (t) { return liveToken(t, displayOne); }).join("") : '<span class="empty">空</span>';
       var name = side === "L" ? "左盤" : "右盤";
-      return '<div class="pan pan-' + side.toLowerCase() + guided + '" data-pan="' + side + '" tabindex="0" aria-label="' + name + '">' +
+      return '<div class="pan pan-' + side.toLowerCase() + '" data-pan="' + side + '" tabindex="0" aria-label="' + name + '">' +
         '<p class="pan-name">' + name + '</p><div class="tokens">' + inner + "</div></div>";
     }
     return '<div class="' + cls + '" id="scale">' +
@@ -304,26 +303,34 @@
       '<p class="scale-status">' + esc(status) + "</p></div>";
   }
   function actionHtml(v) {
+    var purpose;
+    var note;
     if (fx && fx.phase === "ask") return inquiryHtml();
     if (fx) return '<p class="fine">看清楚兩盤：原盤拿走原項，另一盤放下相反項。</p>';
-    var guideNote = "";
-    if (v.mode === "practice") guideNote = v.coach ? '<p class="fine">' + esc(v.coach) + "</p>" : "";
-    else if (v.mode === "trap") guideNote = '<p class="fine">陷阱題沒有黃虛線。只可合併同色的項。</p>';
-    else guideNote = '<p class="fine">挑戰沒有黃虛線。</p>';
+    if (!v.goalSet) {
+      purpose = Engine.purpose();
+      return '<div class="action-card"><h3>先立目標</h3><p class="master">' + esc(purpose.ask) + "</p>" +
+        choiceButtons(purpose.choices, "pick-purpose") + "</div>";
+    }
+    if (askingGoal) {
+      return '<div class="action-card"><h3>看一看</h3><p class="master">' + esc(Engine.goalAsk) + "</p>" +
+        '<div class="choice-list">' +
+        '<button type="button" class="btn btn-ghost" data-act="answer-goal" data-yes="1">有</button>' +
+        '<button type="button" class="btn btn-ghost" data-act="answer-goal" data-yes="0">未有</button></div>' +
+        '<div class="btn-row nav-row"><button type="button" class="btn btn-ghost" data-act="undo"' +
+        (v.canUndo ? "" : " disabled") + ">返回上一步</button></div></div>";
+    }
+    note = v.look ? '<p class="fine">' + esc(v.look) + "</p>" : "";
+    if (v.mode === "trap") note += '<p class="fine">只可合併同色的項。</p>';
     var ops = v.actions.length
       ? '<div class="btn-row">' + v.actions.map(function (action) {
-        var cls = action.guided ? "btn op-btn is-guide" : "btn op-btn btn-ghost";
-        return '<button type="button" class="' + cls + '" data-act="op" data-type="' + esc(action.type) +
+        return '<button type="button" class="btn op-btn btn-ghost" data-act="op" data-type="' + esc(action.type) +
           '" data-value="' + esc(String(action.value)) + '">' + esc(action.label) + "</button>";
       }).join("") + "</div>"
-      : (v.ready
-        ? '<p class="fine">已經是 x＝數 或 數＝x。可以按完成，再代入原式。</p>'
-        : '<p class="fine">乘除用按鈕。x 只留在一邊、而且係數還不是 1 的時候，按鈕才會出現。</p>');
-    var finishCls = v.ready ? "btn btn-primary" : "btn btn-ghost";
-    if (v.finishGuided) finishCls += " is-guide";
-    return '<div class="action-card"><h3>乘除</h3>' + guideNote + ops +
+      : '<p class="fine">乘除用按鈕。係數還不是 1 時，按鈕才會出現。</p>';
+    return '<div class="action-card"><h3>乘除</h3>' + note + ops +
       '<div class="btn-row nav-row">' +
-      '<button type="button" class="' + finishCls + '" data-act="finish">完成</button>' +
+      '<button type="button" class="btn btn-ghost" data-act="finish">完成</button>' +
       '<button type="button" class="btn btn-ghost" data-act="undo"' + (v.canUndo ? "" : " disabled") + ">返回上一步</button>" +
       "</div><p class=\"fine\">拖曳，或先點選再點目標。同色合併；拖到另一盤是兩邊同加或同減。</p></div>";
   }
@@ -355,8 +362,9 @@
       '<p class="' + eqCls + '" id="equation">' + tag + esc(eq) + "</p>" +
       (displayOne && v.unitCoach ? '<p class="fine">' + esc(v.unitCoach) + "</p>" : "") +
       feedbackHtml() +
+      ((!v.goalSet || askingGoal) ? actionHtml(v) : "") +
       scaleHtml(v, displayOne) +
-      actionHtml(v) +
+      ((!v.goalSet || askingGoal) ? "" : actionHtml(v)) +
       stepList(v, false) +
       '<button type="button" class="text-btn" data-act="hub">返回目錄</button>' +
       "</section>"
@@ -498,11 +506,10 @@
     settle = false;
     banner = "";
     reflect = { merge: null, sign: null };
+    askingGoal = false;
     feedback = {
       kind: "info",
-      text: mode === "practice"
-        ? "黃虛線是建議的下一步。同色拖在一起，加減項拖到另一盤。"
-        : "這一題沒有黃虛線。同色才可以合併。",
+      text: "先回答這題想把方程變成甚麼樣子。同色才可以合併。",
     };
     armCoach();
     render();
@@ -530,6 +537,8 @@
       text: result.message || "",
       lines: result.checkLines || [],
     };
+    if (result.askGoal) askingGoal = true;
+    else if (result.applied) askingGoal = false;
     if (result.ok && result.banner) {
       banner = result.banner;
       settle = true;
@@ -900,8 +909,42 @@
       present(Engine.undo(run));
       return;
     }
+    if (act === "pick-purpose") {
+      var purposeResult = Engine.answerPurpose(run, actEl.dataset.choice);
+      feedback = { kind: purposeResult.ok ? "ok" : "info", text: purposeResult.message };
+      render();
+      return;
+    }
+    if (act === "answer-goal") {
+      var goalResult = Engine.answerGoal(run, actEl.dataset.yes === "1");
+      feedback = { kind: "info", text: goalResult.message };
+      if (goalResult.affirmed) {
+        askingGoal = false;
+        screen = "check";
+        checkDraft = "";
+        checkView = null;
+        focusCheck = true;
+        feedback = { kind: "info", text: "把求得的 x 代入原式，看看左右是否相等。" };
+        render();
+        return;
+      }
+      askingGoal = !!(goalResult.reached && !goalResult.affirmed);
+      render();
+      return;
+    }
     if (act === "finish") {
       if (fx) return;
+      if (!run.goalSet) {
+        feedback = { kind: "info", text: "請先回答：我們想把方程變成甚麼樣子？" };
+        render();
+        return;
+      }
+      if (Engine.view(run).ready && !run.goalAffirmed) {
+        askingGoal = true;
+        feedback = { kind: "info", text: "先回答：有達到目標嗎？" };
+        render();
+        return;
+      }
       var gate = Engine.finishGate(run);
       if (!gate.ok) {
         feedback = { kind: "info", text: gate.message };
