@@ -12,6 +12,7 @@
   var checkView = null;
   var focusCheck = false;
   var lampPick = { move: false, divide: false };
+  var askingGoal = false;
   var animTimer = 0;
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -64,7 +65,7 @@
       '<p class="master">天平兩邊必須一樣重。要改方程，就兩邊同時加，或兩邊同時減。</p>' +
       "<ul class=\"rules\">" +
       "<li>移項是「兩邊同加／同減」。加上相反數之後，按「兩邊一起化簡」，讓零一起消去。</li>" +
-      "<li>乘除的係數不要當加減項來處理。除數是「兩邊同乘／同除」。練習題不用乘除。</li>" +
+      "<li>乘除的係數不要當加減項來處理。除數是「兩邊同乘／同除」。引導模式的題目不用乘除。</li>" +
       "<li>完成後到複秤：先核對用過的口訣燈，再填 x，代回原式。</li>" +
       "<li>每題由 100 分起算。複秤填錯扣 10 分，最低 0 分。第一次就填對，另加 10 分。</li>" +
       "</ul>" +
@@ -73,10 +74,11 @@
       "</div>" +
       '<p class="fine">移項＝兩邊同加／同減。除數＝兩邊同乘／同除。其餘口訣本章不用。</p>' +
       '<div class="btn-row">' +
-      '<button type="button" class="btn btn-primary" data-act="enter" data-mode="practice">開始練習（5 題）</button>' +
-      '<button type="button" class="btn btn-ghost" data-act="enter" data-mode="challenge">開始挑戰（3 題）</button>' +
+      '<button type="button" class="btn btn-primary" data-act="enter" data-mode="practice">開始引導模式（5 題）</button>' +
+      '<button type="button" class="btn btn-ghost" data-act="enter" data-mode="challenge">開始挑戰模式（3 題）</button>' +
       "</div>" +
-      '<p class="fine">練習會以黃虛線標出建議的下一步。挑戰是另一組題目，不提示。</p>' +
+      '<p class="fine">每題先問目標。化簡之後再問有沒有達到。引導模式只會用文字問句，不會標出下一步。</p>' +
+      '<p class="fine">第二章：<a href="../unknown-scale-like-terms/">同類項，x 在兩邊</a></p>' +
       "</section>"
     );
   }
@@ -132,34 +134,43 @@
     );
   }
 
-  function opButton(action, wide) {
-    var cls = ["btn", "op-btn"];
-    if (wide) cls.push("wide");
-    if (action.guided) cls.push("is-guide");
-    else cls.push("btn-ghost");
+  function opButton(action) {
     var value = action.value == null ? "" : String(action.value);
-    return '<button type="button" class="' + cls.join(" ") + '" data-act="op" data-type="' +
+    return '<button type="button" class="btn btn-ghost op-btn" data-act="op" data-type="' +
       esc(action.type) + '" data-value="' + esc(value) + '">' + esc(action.label) + "</button>";
   }
 
+  function choiceButtons(choices, act) {
+    return '<div class="choice-list">' + choices.map(function (choice, index) {
+      return '<button type="button" class="btn btn-ghost" data-act="' + act + '" data-choice="' + index + '">' +
+        esc(choice) + "</button>";
+    }).join("") + "</div>";
+  }
+
   function renderActions(v) {
-    var tidy = [];
-    var rest = [];
-    var i;
-    for (i = 0; i < v.actions.length; i += 1) {
-      if (v.actions[i].group === "tidy") tidy.push(v.actions[i]);
-      else rest.push(v.actions[i]);
+    var purpose;
+    var goalButtons;
+    if (!v.goalSet) {
+      purpose = Engine.purpose();
+      return '<div class="action-card"><h3>先立目標</h3><p class="master">' + esc(purpose.ask) + "</p>" +
+        choiceButtons(purpose.choices, "pick-purpose") + "</div>";
     }
-    var checkCls = v.ready ? "btn btn-primary" : "btn btn-ghost";
-    if (v.mode === "practice" && v.suggest && v.suggest.type === "check") checkCls += " is-guide";
+    if (askingGoal) {
+      goalButtons = '<div class="choice-list">' +
+        '<button type="button" class="btn btn-ghost" data-act="answer-goal" data-yes="1">有</button>' +
+        '<button type="button" class="btn btn-ghost" data-act="answer-goal" data-yes="0">未有</button></div>';
+      return '<div class="action-card"><h3>看一看</h3><p class="master">' + esc(Engine.goalAsk) + "</p>" +
+        goalButtons +
+        '<div class="btn-row nav-row"><button type="button" class="btn btn-ghost" data-act="undo"' +
+        (v.canUndo ? "" : " disabled") + ">返回上一步</button></div></div>";
+    }
     return (
       '<div class="action-card">' +
       "<h3>兩邊一起</h3>" +
-      (v.mode === "practice" ? '<p class="fine">黃虛線是建議的下一步。</p>' : '<p class="fine">挑戰不提示下一步。</p>') +
-      tidy.map(function (action) { return opButton(action, true); }).join("") +
-      '<div class="btn-grid">' + rest.map(function (action) { return opButton(action, false); }).join("") + "</div>" +
+      (v.look ? '<p class="fine">' + esc(v.look) + "</p>" : "") +
+      '<div class="btn-grid">' + v.actions.map(opButton).join("") + "</div>" +
       '<div class="btn-row nav-row">' +
-      '<button type="button" class="' + checkCls + '" data-act="to-check">到複秤</button>' +
+      '<button type="button" class="btn btn-ghost" data-act="to-check">到複秤</button>' +
       '<button type="button" class="btn btn-ghost" data-act="undo"' + (v.canUndo ? "" : " disabled") + ">返回上一步</button>" +
       "</div></div>"
     );
@@ -178,8 +189,9 @@
       lampButtons(v) +
       '<p class="expr" id="equation">' + esc(v.equation) + "</p>" +
       feedbackHtml() +
+      ((!v.goalSet || askingGoal) ? renderActions(v) : "") +
       scaleHtml(v) +
-      renderActions(v) +
+      ((!v.goalSet || askingGoal) ? "" : renderActions(v)) +
       '<button type="button" class="text-btn" data-act="intro">返回開場</button>' +
       "</section>"
     );
@@ -276,7 +288,7 @@
 
   function renderFinale() {
     var total = 0;
-    var label = mode === "challenge" ? "挑戰" : "練習";
+    var label = mode === "challenge" ? "挑戰模式" : "引導模式";
     var rows = results.map(function (item) {
       total += item.score;
       return "<li>第 " + item.number + " 題 " + esc(item.title) + "：x = " + fmt(item.entry) +
@@ -285,7 +297,7 @@
     return (
       '<section class="card" data-screen="finale">' +
       "<h2>" + label + "完成</h2>" +
-      '<p class="master">' + (mode === "challenge" ? "三題挑戰都已複秤。" : "五題練習都已複秤。") + "</p>" +
+      '<p class="master">' + (mode === "challenge" ? "挑戰模式的三題都已複秤。" : "引導模式的五題都已複秤。") + "</p>" +
       "<ul class=\"rules\">" + rows + "</ul>" +
       "<p>合計 <b>" + total + "</b> 分</p>" +
       '<div class="btn-row">' +
@@ -320,13 +332,12 @@
     checkDraft = "";
     checkView = null;
     lampPick = { move: false, divide: false };
+    askingGoal = false;
     settle = false;
     banner = "";
     feedback = {
       kind: "info",
-      text: mode === "practice"
-        ? "按黃虛線的按鈕。每一次都是兩邊一起改變。"
-        : "挑戰不提示下一步。每一次都是兩邊一起改變。",
+      text: "先回答這題想把方程變成甚麼樣子。每一次都是兩邊一起改變。",
     };
     render();
   }
@@ -346,6 +357,7 @@
     if (!result) return;
     var penalized = result.message && result.message.indexOf("扣") !== -1;
     feedback = { kind: result.ok ? "ok" : (penalized ? "bad" : "info"), text: result.message };
+    askingGoal = !!result.askGoal;
     if (result.ok && result.applied && result.banner) {
       settle = true;
       banner = result.banner;
@@ -359,7 +371,19 @@
   }
 
   function goCheck() {
-    var gate = Engine.gateCheck(run);
+    var gate;
+    if (run && !run.goalSet) {
+      feedback = { kind: "info", text: "請先回答：我們想把方程變成甚麼樣子？" };
+      render();
+      return;
+    }
+    if (run && Engine.view(run).ready && !run.goalAffirmed) {
+      askingGoal = true;
+      feedback = { kind: "info", text: "先回答：有達到目標嗎？" };
+      render();
+      return;
+    }
+    gate = Engine.gateCheck(run);
     if (!gate.ok) {
       feedback = { kind: "info", text: gate.message };
       render();
@@ -452,6 +476,24 @@
     }
     if (act === "undo") {
       apply(Engine.undo(run));
+      return;
+    }
+    if (act === "pick-purpose") {
+      var purposeResult = Engine.answerPurpose(run, actEl.dataset.choice);
+      feedback = { kind: purposeResult.ok ? "ok" : "info", text: purposeResult.message };
+      render();
+      return;
+    }
+    if (act === "answer-goal") {
+      var goalResult = Engine.answerGoal(run, actEl.dataset.yes === "1");
+      feedback = { kind: "info", text: goalResult.message };
+      if (goalResult.affirmed) {
+        askingGoal = false;
+        goCheck();
+        return;
+      }
+      askingGoal = !!(goalResult.reached && !goalResult.affirmed);
+      render();
       return;
     }
     if (act === "to-check") {
