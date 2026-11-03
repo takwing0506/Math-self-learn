@@ -77,6 +77,7 @@
       '<button type="button" class="btn btn-ghost" data-act="enter" data-mode="challenge">開始挑戰（3 題）</button>' +
       "</div>" +
       '<p class="fine">練習會以黃虛線標出建議的下一步。挑戰是另一組題目，不提示。</p>' +
+      '<p class="fine">第二章：<a href="../unknown-scale-like-terms/">同類項，x 在兩邊</a></p>' +
       "</section>"
     );
   }
