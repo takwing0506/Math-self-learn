@@ -13,6 +13,9 @@
   var focusCheck = false;
   var lampPick = { move: false, divide: false };
   var askingGoal = false;
+  var wrongKey = "";
+  var wrongChoices = [];
+  var feedbackFlash = 0;
   var animTimer = 0;
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -51,6 +54,7 @@
   function feedbackHtml() {
     if (!feedback) return "";
     var cls = feedback.kind === "ok" ? "notice ok" : feedback.kind === "bad" ? "notice" : "hint";
+    if (feedback.flash) cls += " is-flash";
     return '<div class="' + cls + '" id="feedback">' + esc(feedback.text) + "</div>";
   }
 
@@ -96,7 +100,7 @@
     else cls.push("token-w");
     if (t.neg) cls.push("neg");
     if (t.fresh) cls.push("arrive");
-    var kicker = t.type === "x" ? "<small>箱</small>" : "";
+    var kicker = t.type === "x" ? "<small>x</small>" : "";
     return '<span class="' + cls.join(" ") + '">' + kicker + "<b>" + esc(t.label) + "</b></span>";
   }
 
@@ -140,11 +144,23 @@
       esc(action.type) + '" data-value="' + esc(value) + '">' + esc(action.label) + "</button>";
   }
 
-  function choiceButtons(choices, act) {
+  function choiceButtons(choices, act, key) {
+    var marked = wrongKey === key ? wrongChoices : [];
     return '<div class="choice-list">' + choices.map(function (choice, index) {
-      return '<button type="button" class="btn btn-ghost" data-act="' + act + '" data-choice="' + index + '">' +
+      var cls = "btn btn-ghost" + (marked.indexOf(index) !== -1 ? " is-wrong" : "");
+      return '<button type="button" class="' + cls + '" data-act="' + act + '" data-choice="' + index + '">' +
         esc(choice) + "</button>";
     }).join("") + "</div>";
+  }
+
+  function markWrong(key, choice) {
+    var index = Number(choice);
+    if (wrongKey !== key) {
+      wrongKey = key;
+      wrongChoices = [];
+    }
+    if (wrongChoices.indexOf(index) === -1) wrongChoices.push(index);
+    feedbackFlash += 1;
   }
 
   function renderActions(v) {
@@ -153,20 +169,21 @@
     if (!v.goalSet) {
       purpose = Engine.purpose();
       return '<div class="action-card"><h3>先立目標</h3><p class="master">' + esc(purpose.ask) + "</p>" +
-        choiceButtons(purpose.choices, "pick-purpose") + "</div>";
+        choiceButtons(purpose.choices, "pick-purpose", "purpose") + "</div>";
     }
     if (askingGoal) {
       goalButtons = '<div class="choice-list">' +
-        '<button type="button" class="btn btn-ghost" data-act="answer-goal" data-yes="1">有</button>' +
-        '<button type="button" class="btn btn-ghost" data-act="answer-goal" data-yes="0">未有</button></div>';
+        '<button type="button" class="btn btn-ghost' + (wrongKey === "goal" && wrongChoices.indexOf(0) !== -1 ? " is-wrong" : "") + '" data-act="answer-goal" data-yes="1">有</button>' +
+        '<button type="button" class="btn btn-ghost' + (wrongKey === "goal" && wrongChoices.indexOf(1) !== -1 ? " is-wrong" : "") + '" data-act="answer-goal" data-yes="0">未有</button></div>';
       return '<div class="action-card"><h3>看一看</h3><p class="master">' + esc(Engine.goalAsk) + "</p>" +
         goalButtons +
         '<div class="btn-row nav-row"><button type="button" class="btn btn-ghost" data-act="undo"' +
         (v.canUndo ? "" : " disabled") + ">返回上一步</button></div></div>";
     }
-    return (
+      return (
       '<div class="action-card">' +
       "<h3>兩邊一起</h3>" +
+      '<p class="goal-prompt">目標是一邊只剩 x，應做甚麼呢？</p>' +
       (v.look ? '<p class="fine">' + esc(v.look) + "</p>" : "") +
       '<div class="btn-grid">' + v.actions.map(opButton).join("") + "</div>" +
       '<div class="btn-row nav-row">' +
@@ -188,10 +205,9 @@
       '<p class="motto slim">' + esc(v.motto) + "</p>" +
       lampButtons(v) +
       '<p class="expr" id="equation">' + esc(v.equation) + "</p>" +
-      feedbackHtml() +
-      ((!v.goalSet || askingGoal) ? renderActions(v) : "") +
       scaleHtml(v) +
-      ((!v.goalSet || askingGoal) ? "" : renderActions(v)) +
+      feedbackHtml() +
+      renderActions(v) +
       '<button type="button" class="text-btn" data-act="intro">返回開場</button>' +
       "</section>"
     );
@@ -309,6 +325,7 @@
   }
 
   function render() {
+    var scrollY = window.scrollY || 0;
     var draft = document.getElementById("x-entry");
     if (draft) checkDraft = draft.value;
     var body = renderIntro();
@@ -324,6 +341,7 @@
       if (input) input.focus();
       focusCheck = false;
     }
+    if (scrollY) window.scrollTo(0, scrollY);
   }
 
   function startMission(index) {
@@ -480,15 +498,24 @@
     }
     if (act === "pick-purpose") {
       var purposeResult = Engine.answerPurpose(run, actEl.dataset.choice);
-      feedback = { kind: purposeResult.ok ? "ok" : "info", text: purposeResult.message };
+      if (!purposeResult.ok) {
+        markWrong("purpose", actEl.dataset.choice);
+        feedback = { kind: "bad", text: purposeResult.message, flash: feedbackFlash };
+      } else {
+        wrongChoices = [];
+        feedback = { kind: "ok", text: purposeResult.message, flash: 0 };
+      }
       render();
       return;
     }
     if (act === "answer-goal") {
       var goalResult = Engine.answerGoal(run, actEl.dataset.yes === "1");
-      feedback = { kind: "info", text: goalResult.message };
+      var goalMiss = (goalResult.reached && !goalResult.affirmed) || (!goalResult.reached && actEl.dataset.yes === "1");
+      if (goalMiss) markWrong("goal", actEl.dataset.yes === "1" ? 0 : 1);
+      feedback = { kind: goalMiss ? "bad" : "info", text: goalResult.message, flash: goalMiss ? feedbackFlash : 0 };
       if (goalResult.affirmed) {
         askingGoal = false;
+        wrongChoices = [];
         goCheck();
         return;
       }

@@ -25,6 +25,9 @@
   var focusCheck = false;
   var reflect = { merge: null, sign: null };
   var askingGoal = false;
+  var wrongKey = "";
+  var wrongChoices = [];
+  var feedbackFlash = 0;
   var press = null;
   var fromPointer = false;
   var pointerAt = 0;
@@ -107,6 +110,7 @@
   function feedbackHtml() {
     if (!feedback) return "";
     var cls = feedback.kind === "ok" ? "notice ok" : feedback.kind === "bad" ? "notice" : "hint";
+    if (feedback.flash) cls += " is-flash";
     var lines = (feedback.lines || []).map(function (line) {
       return "<li>" + esc(line) + "</li>";
     }).join("");
@@ -115,7 +119,7 @@
   }
   function staticToken(t) {
     var cls = "token " + (t.type === "x" ? "token-x" : "token-w") + (t.neg ? " neg" : "");
-    var kicker = t.type === "x" ? "<small>箱</small>" : "";
+    var kicker = t.type === "x" ? "<small>x</small>" : "";
     return '<span class="' + cls + '" aria-hidden="true">' + kicker + "<b>" + esc(t.label) + "</b></span>";
   }
   function liveToken(t, displayOne) {
@@ -126,8 +130,8 @@
     if (t.leaving) cls.push("is-leaving");
     if (selectedId === t.id) cls.push("is-selected");
     if (shakeIds.indexOf(t.id) !== -1) cls.push("shake");
-    var name = (t.type === "x" ? "未知箱 " : "砝碼 ") + label;
-    var kicker = t.type === "x" ? "<small>箱</small>" : "";
+    var name = (t.type === "x" ? "未知數 " : "砝碼 ") + label;
+    var kicker = t.type === "x" ? "<small>x</small>" : "";
     return '<button type="button" class="' + cls.join(" ") + '" data-term="' + esc(t.id) +
       '" data-side="' + t.side + '" data-kind="' + t.type + '" data-label="' + esc(label) +
       '" aria-pressed="' + (selectedId === t.id ? "true" : "false") + '" aria-label="' + esc(name) + '">' +
@@ -146,11 +150,23 @@
       '<div class="mid"><div class="sync-label equals" aria-hidden="true">＝</div></div>' +
       miniPan("R", board.R) + "</div></article>";
   }
-  function choiceButtons(choices, act) {
+  function choiceButtons(choices, act, key) {
+    var marked = wrongKey === key ? wrongChoices : [];
     return '<div class="choice-list">' + choices.map(function (choice, index) {
-      return '<button type="button" class="btn btn-ghost" data-act="' + act + '" data-choice="' + index + '">' +
+      var cls = "btn btn-ghost" + (marked.indexOf(index) !== -1 ? " is-wrong" : "");
+      return '<button type="button" class="' + cls + '" data-act="' + act + '" data-choice="' + index + '">' +
         esc(choice) + "</button>";
     }).join("") + "</div>";
+  }
+
+  function markWrong(key, choice) {
+    var index = Number(choice);
+    if (wrongKey !== key) {
+      wrongKey = key;
+      wrongChoices = [];
+    }
+    if (wrongChoices.indexOf(index) === -1) wrongChoices.push(index);
+    feedbackFlash += 1;
   }
   function stepList(v, open) {
     var items = v.steps.map(function (step) {
@@ -183,7 +199,7 @@
       mottoHtml() +
       '<p class="master">這一章的 x 可以出現在兩邊。先合併同色的項，再處理加減，最後才乘除。</p>' +
       "<ul class=\"rules\">" +
-      "<li>未知箱和砝碼顏色不同。只有同色可以拖在一起合併。</li>" +
+      "<li>未知數和砝碼顏色不同。只有同色可以拖在一起合併。</li>" +
       "<li>加減項可以拖到另一盤：原盤拿走該項，另一盤放下相反項。這等於兩邊同加或同減。</li>" +
       "<li>乘除只用按鈕，兩邊一起乘或一起除。不要拖。</li>" +
       "<li>化成 x＝數 或 數＝x 才能按完成，然後代入原式。</li>" +
@@ -206,7 +222,7 @@
       '<div class="contrast">' + boardHtml(entry.boards[0], entry.captions[0]) +
       boardHtml(entry.boards[1], entry.captions[1]) + "</div>" +
       '<p class="master">' + esc(step.ask) + "</p>" +
-      choiceButtons(step.choices, "pick-entry") +
+      choiceButtons(step.choices, "pick-entry", "entry-" + entryStep) +
       feedbackHtml() +
       '<button type="button" class="text-btn" data-act="intro">返回開場</button>' +
       "</section>"
@@ -225,7 +241,7 @@
       '<button type="button" class="btn btn-ghost" data-act="enter" data-mode="challenge">挑戰模式（3 題）</button>' +
       "</div>" +
       '<button type="button" class="text-btn" data-act="review-entry">再看一次對比</button>' +
-      '<button type="button" class="text-btn" data-act="reset-move">下次拖未知箱時，再問三問</button>' +
+      '<button type="button" class="text-btn" data-act="reset-move">下次拖未知數時，再問三問</button>' +
       '<p class="fine">上一章：<a href="../unknown-scale/">天平工房 · 第一章</a></p>' +
       "</section>"
     );
@@ -236,7 +252,7 @@
     var tokens = v.terms.map(function (t) {
       var label = showReveal ? t.labelOne : t.label;
       var cls = "token " + (t.type === "x" ? "token-x" : "token-w") + (t.neg ? " neg" : "");
-      var kicker = t.type === "x" ? "<small>箱</small>" : "";
+      var kicker = t.type === "x" ? "<small>x</small>" : "";
       return '<span class="' + cls + '">' + kicker + "<b>" + esc(label) + "</b></span>";
     }).join("");
     var actions = warmHold
@@ -264,7 +280,7 @@
     return (
       '<section class="card" data-screen="warmup-done">' +
       "<h2>熱身完成</h2>" +
-      '<p class="master">同色才是同類項。未知箱和砝碼不能合併。</p>' +
+      '<p class="master">同色才是同類項。未知數和砝碼不能合併。</p>' +
       "<p>辨認得分 <b>" + warm.score + "</b></p>" +
       '<div class="btn-row">' +
       '<button type="button" class="btn btn-primary" data-act="enter" data-mode="practice">開始練習</button>' +
@@ -287,7 +303,7 @@
     var mid = shownBanner
       ? '<div class="sync-label">' + esc(shownBanner) + "</div>"
       : '<div class="sync-label equals" aria-hidden="true">＝</div>';
-    var status = fx ? fx.plan.narration : v.ready ? "一邊只剩未知箱，另一邊只剩一個數。" : "天平保持平衡。";
+    var status = fx ? fx.plan.narration : v.ready ? "一邊只剩未知數，另一邊只剩一個數。" : "天平保持平衡。";
     var cls = "scale" + (settle || fx ? " is-sync" : "") + (fx || !v.goalSet || askingGoal ? " is-locked" : "");
     function pan(side) {
       var tokens = v.tokens[side];
@@ -310,13 +326,13 @@
     if (!v.goalSet) {
       purpose = Engine.purpose();
       return '<div class="action-card"><h3>先立目標</h3><p class="master">' + esc(purpose.ask) + "</p>" +
-        choiceButtons(purpose.choices, "pick-purpose") + "</div>";
+        choiceButtons(purpose.choices, "pick-purpose", "purpose") + "</div>";
     }
     if (askingGoal) {
       return '<div class="action-card"><h3>看一看</h3><p class="master">' + esc(Engine.goalAsk) + "</p>" +
         '<div class="choice-list">' +
-        '<button type="button" class="btn btn-ghost" data-act="answer-goal" data-yes="1">有</button>' +
-        '<button type="button" class="btn btn-ghost" data-act="answer-goal" data-yes="0">未有</button></div>' +
+        '<button type="button" class="btn btn-ghost' + (wrongKey === "goal" && wrongChoices.indexOf(0) !== -1 ? " is-wrong" : "") + '" data-act="answer-goal" data-yes="1">有</button>' +
+        '<button type="button" class="btn btn-ghost' + (wrongKey === "goal" && wrongChoices.indexOf(1) !== -1 ? " is-wrong" : "") + '" data-act="answer-goal" data-yes="0">未有</button></div>' +
         '<div class="btn-row nav-row"><button type="button" class="btn btn-ghost" data-act="undo"' +
         (v.canUndo ? "" : " disabled") + ">返回上一步</button></div></div>";
     }
@@ -328,7 +344,8 @@
           '" data-value="' + esc(String(action.value)) + '">' + esc(action.label) + "</button>";
       }).join("") + "</div>"
       : '<p class="fine">乘除用按鈕。係數還不是 1 時，按鈕才會出現。</p>';
-    return '<div class="action-card"><h3>乘除</h3>' + note + ops +
+    return '<div class="action-card"><h3>兩邊一起</h3>' +
+      '<p class="goal-prompt">目標是一邊只剩 x，應做甚麼呢？</p>' + note + ops +
       '<div class="btn-row nav-row">' +
       '<button type="button" class="btn btn-ghost" data-act="finish">完成</button>' +
       '<button type="button" class="btn btn-ghost" data-act="undo"' + (v.canUndo ? "" : " disabled") + ">返回上一步</button>" +
@@ -341,7 +358,7 @@
       '<p class="q-no">' + ASK_LABEL[fx.askStep] + " " + ASK_STEP[fx.askStep] + "</p>" +
       '<p class="lead">' + esc(fx.plan.narration) + "這一步尚未寫入。</p>" +
       '<p class="master">' + esc(part.ask) + "</p>" +
-      choiceButtons(part.choices, "pick-move") +
+      choiceButtons(part.choices, "pick-move", "move-" + fx.askStep) +
       '<button type="button" class="text-btn" data-act="cancel-move">取消，還原天平</button></div>';
   }
   function renderSolve() {
@@ -361,10 +378,9 @@
       lampButtons(v) +
       '<p class="' + eqCls + '" id="equation">' + tag + esc(eq) + "</p>" +
       (displayOne && v.unitCoach ? '<p class="fine">' + esc(v.unitCoach) + "</p>" : "") +
-      feedbackHtml() +
-      ((!v.goalSet || askingGoal) ? actionHtml(v) : "") +
       scaleHtml(v, displayOne) +
-      ((!v.goalSet || askingGoal) ? "" : actionHtml(v)) +
+      feedbackHtml() +
+      actionHtml(v) +
       stepList(v, false) +
       '<button type="button" class="text-btn" data-act="hub">返回目錄</button>' +
       "</section>"
@@ -455,6 +471,7 @@
 
   function render() {
     if (press) return;
+    var scrollY = window.scrollY || 0;
     var draft = document.getElementById("x-entry");
     if (draft) checkDraft = draft.value;
     var body = renderIntro();
@@ -479,7 +496,7 @@
     if (screen === "solve" && fx && fx.phase !== "leave") {
       var scale = document.getElementById("scale");
       if (scale && scale.scrollIntoView) scale.scrollIntoView({ block: "start" });
-    }
+    } else if (scrollY) window.scrollTo(0, scrollY);
   }
 
   function armCoach() {
@@ -778,8 +795,14 @@
 
   function answerEntry(choice) {
     var graded = Engine.gradeEntry(entryStep, choice);
-    feedback = { kind: graded.ok ? "ok" : "info", text: graded.message };
-    if (!graded.ok) { render(); return; }
+    if (!graded.ok) {
+      markWrong("entry-" + entryStep, choice);
+      feedback = { kind: "bad", text: graded.message, flash: feedbackFlash };
+      render();
+      return;
+    }
+    wrongChoices = [];
+    feedback = { kind: "ok", text: graded.message };
     if (graded.done) {
       entryPassed = true;
       writeStore({ entryPassed: true });
@@ -794,8 +817,14 @@
   function answerMove(choice) {
     if (!fx || fx.phase !== "ask") return;
     var graded = Engine.gradeInquiry(fx.plan, fx.askStep, choice);
-    feedback = { kind: graded.ok ? "ok" : "info", text: graded.message };
-    if (!graded.ok) { render(); return; }
+    if (!graded.ok) {
+      markWrong("move-" + fx.askStep, choice);
+      feedback = { kind: "bad", text: graded.message, flash: feedbackFlash };
+      render();
+      return;
+    }
+    wrongChoices = [];
+    feedback = { kind: "ok", text: graded.message };
     if (ASK_ORDER[fx.askStep]) {
       fx.askStep = ASK_ORDER[fx.askStep];
       render();
@@ -860,7 +889,7 @@
     if (act === "reset-move") {
       movePassed = false;
       writeStore({ movePassed: false });
-      feedback = { kind: "info", text: "下次把未知箱拖到另一盤時，會再問那三問。" };
+      feedback = { kind: "info", text: "下次把未知數拖到另一盤時，會再問那三問。" };
       render();
       return;
     }
@@ -911,13 +940,21 @@
     }
     if (act === "pick-purpose") {
       var purposeResult = Engine.answerPurpose(run, actEl.dataset.choice);
-      feedback = { kind: purposeResult.ok ? "ok" : "info", text: purposeResult.message };
+      if (!purposeResult.ok) {
+        markWrong("purpose", actEl.dataset.choice);
+        feedback = { kind: "bad", text: purposeResult.message, flash: feedbackFlash };
+      } else {
+        wrongChoices = [];
+        feedback = { kind: "ok", text: purposeResult.message };
+      }
       render();
       return;
     }
     if (act === "answer-goal") {
       var goalResult = Engine.answerGoal(run, actEl.dataset.yes === "1");
-      feedback = { kind: "info", text: goalResult.message };
+      var goalMiss = (goalResult.reached && !goalResult.affirmed) || (!goalResult.reached && actEl.dataset.yes === "1");
+      if (goalMiss) markWrong("goal", actEl.dataset.yes === "1" ? 0 : 1);
+      feedback = { kind: goalMiss ? "bad" : "info", text: goalResult.message, flash: goalMiss ? feedbackFlash : 0 };
       if (goalResult.affirmed) {
         askingGoal = false;
         screen = "check";

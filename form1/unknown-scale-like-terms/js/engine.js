@@ -17,14 +17,14 @@
 
   var PRACTICE = [
     {
-      title: "同邊的未知箱",
-      brief: "左盤有兩隻未知箱，右盤是砝碼。",
+      title: "同邊的未知數",
+      brief: "左盤有兩個未知數，右盤是砝碼。",
       L: [["x", 3], ["x", -1]],
       R: [["n", 8]],
     },
     {
-      title: "兩隻正的未知箱",
-      brief: "左盤的未知箱都是正的。",
+      title: "兩個正的未知數",
+      brief: "左盤的未知數都是正的。",
       L: [["x", 5], ["x", 2]],
       R: [["n", 21]],
     },
@@ -35,14 +35,14 @@
       R: [["n", 10], ["x", 1]],
     },
     {
-      title: "左右都有箱和砝碼",
-      brief: "兩盤都有未知箱，也都有砝碼。",
+      title: "左右都有未知數和砝碼",
+      brief: "兩盤都有未知數，也都有砝碼。",
       L: [["x", 7], ["n", -3]],
       R: [["x", 2], ["n", 12]],
     },
     {
       title: "常數留在左盤",
-      brief: "左盤有未知箱和砝碼，右盤是未知箱。",
+      brief: "左盤有未知數和砝碼，右盤是未知數。",
       L: [["x", 2], ["n", 9]],
       R: [["x", 5]],
     },
@@ -50,14 +50,14 @@
 
   var TRAP = [
     {
-      title: "箱和砝碼",
-      brief: "左盤有未知箱，也有砝碼。",
+      title: "未知數和砝碼",
+      brief: "左盤有未知數，也有砝碼。",
       L: [["x", 3], ["n", 5]],
       R: [["n", 20]],
     },
     {
-      title: "右盤的未知箱",
-      brief: "左盤有未知箱和砝碼，右盤是未知箱。",
+      title: "右盤的未知數",
+      brief: "左盤有未知數和砝碼，右盤是未知數。",
       L: [["x", 2], ["n", 4]],
       R: [["x", 4]],
     },
@@ -77,14 +77,14 @@
       R: [["n", 4], ["x", 9]],
     },
     {
-      title: "左盤的負未知箱",
-      brief: "左盤有負的未知箱。",
+      title: "左盤的負未知數",
+      brief: "左盤有負的未知數。",
       L: [["n", 4], ["x", -2]],
       R: [["x", 1], ["n", -8]],
     },
     {
       title: "一邊有三項",
-      brief: "左盤有三項，右盤有未知箱和砝碼。",
+      brief: "左盤有三項，右盤有未知數和砝碼。",
       L: [["x", 1], ["x", 4], ["n", -7]],
       R: [["x", 2], ["n", -16]],
     },
@@ -132,7 +132,12 @@
       ],
       answer: 1,
       right: "對。第二條兩邊都有 x。",
-      wrong: "再看一次：x 出現在左盤、右盤，還是兩邊都有？",
+      wrongs: [
+        "再數一次第二條：左右是不是都寫著 x？",
+        "",
+        "第二條的左右都寫著 x，不是沒有未知數。",
+        "兩條都還有別的項，尚未寫成 x＝一個數。",
+      ],
     },
     {
       ask: "而家兩邊都有 x，同之前只有一邊有 x，解法會有咩分別？",
@@ -144,7 +149,12 @@
       ],
       answer: 2,
       right: "對。先把 x 集中到同一邊，再處理係數。",
-      wrong: "只有一邊有 x 時，處理砝碼和係數就好。兩邊都有 x 時，要先集中 x 項。",
+      wrongs: [
+        "兩邊仍有 x。就算兩邊同除，也不能令一邊只剩 x。",
+        "把 x 刪掉會改變方程，不是解法。",
+        "",
+        "x 留在兩邊時，還沒有變成一邊只剩 x。",
+      ],
     },
     {
       ask: "可唔可以直接兩邊同除？定係要先處理啲咩？",
@@ -156,7 +166,12 @@
       ],
       answer: 3,
       right: "對。先處理兩邊的 x 項，再考慮乘除。",
-      wrong: "右邊有兩項。若現在就兩邊同除，x 仍會留在兩邊。先把 x 項集中。",
+      wrongs: [
+        "兩邊仍有 x。就算兩邊同除，也不能令一邊只剩 x。",
+        "這兩條是用來對比，不是把它們加在一起。",
+        "估計一個數不能代替解方程。",
+        "",
+      ],
     },
   ];
 
@@ -418,34 +433,39 @@
     if (isSolvedForm(sides)) return { ok: true, message: "" };
     eq = formatEq(sides, false);
     if (hasPair(sides.L) || hasPair(sides.R)) {
-      return { ok: false, message: "還沒有達到目標。現在是 " + eq + "。一邊要只剩未知箱 x，另一邊只剩一個數。" };
+      return { ok: false, message: "還沒有達到目標。現在是 " + eq + "。一邊要只剩未知數 x，另一邊只剩一個數。" };
     }
     if (xTerms(sides.L).length && xTerms(sides.R).length) {
-      return { ok: false, message: "還沒有達到目標。現在是 " + eq + "。未知箱還在兩邊，尚未變成一邊只剩 x。" };
+      return { ok: false, message: "還沒有達到目標。現在是 " + eq + "。未知數還在兩邊，尚未變成一邊只剩 x。" };
     }
     if (constantBesideX(sides)) {
-      return { ok: false, message: "還沒有達到目標。現在是 " + eq + "。有未知箱的那邊仍有砝碼。" };
+      return { ok: false, message: "還沒有達到目標。現在是 " + eq + "。有未知數的那邊仍有砝碼。" };
     }
     if (loneCoeff(sides) !== null && loneCoeff(sides) !== 1) {
       return {
         ok: false,
-        message: "還沒有達到目標。現在是 " + eq + "。未知箱的係數還不是 1。像 2x＝10、10＝2x、−x＝4 都不可以完成。乘除請用按鈕，自己決定。",
+        message: "還沒有達到目標。現在是 " + eq + "。未知數的係數還不是 1。像 2x＝10、10＝2x、−x＝4 都不可以完成。乘除請用按鈕，自己決定。",
       };
     }
-    return { ok: false, message: "還沒有達到目標。一邊要只剩未知箱 x，另一邊只剩一個數。" };
+    return { ok: false, message: "還沒有達到目標。一邊要只剩未知數 x，另一邊只剩一個數。" };
   }
 
   var PURPOSE = {
     ask: "我們想把方程變成甚麼樣子？",
     choices: [
       "兩邊的數字一樣大就好。",
-      "先把未知箱乘開。",
-      "一邊只剩未知箱（x），另一邊只剩一個數。",
+      "先把未知數乘開。",
+      "一邊只剩未知數（x），另一邊只剩一個數。",
       "把所有項都刪掉。",
     ],
     answer: 2,
     right: "對。目標是一邊只剩 x，另一邊只剩一個數。寫成 x＝一個數，或一個數＝x，都算達到。",
-    wrong: "還不是。再想：解完之後，未知箱應該單獨留在一邊，另一邊只剩一個數。",
+    wrongs: [
+      "兩邊數字一樣大，未知數仍可能留在兩邊，方程還未解完。",
+      "先把未知數乘開，並不能令它單獨留在一邊。",
+      "",
+      "把項刪掉會改變方程，天平兩邊不再相等。",
+    ],
   };
   var GOAL_ASK = "有達到目標嗎？";
 
@@ -520,11 +540,11 @@
     var step;
     if (run.mode !== "practice" || !run.goalSet) return "";
     step = hint(run);
-    if (!step || step.type === "finish") return "現在是不是一邊只剩未知箱，另一邊只剩一個數？";
+    if (!step || step.type === "finish") return "現在是不是一邊只剩未知數，另一邊只剩一個數？";
     if (step.type === "merge") return "這一盤有沒有兩個同色的項？";
-    if (step.type === "move" && step.kind === "x") return "是不是兩邊都還有未知箱？";
-    if (step.type === "move") return "有未知箱的那邊，是否還有砝碼？";
-    if (step.type === "div" || step.type === "mul") return "未知箱的係數是不是 1？";
+    if (step.type === "move" && step.kind === "x") return "是不是兩邊都還有未知數？";
+    if (step.type === "move") return "有未知數的那邊，是否還有砝碼？";
+    if (step.type === "div" || step.type === "mul") return "未知數的係數是不是 1？";
     return "";
   }
 
@@ -670,7 +690,7 @@
       applied: false,
       alarm: true,
       banner: "",
-      message: "未知箱同砝碼唔係同類項，唔可以合併。",
+      message: "未知數同砝碼唔係同類項，唔可以合併。",
       checkLines: unlikeLines(a, b),
       shakeIds: [a.id, b.id],
     };
@@ -755,7 +775,7 @@
     for (i = 0; i < allowed.length; i += 1) {
       if (allowed[i].type === action.type && allowed[i].value === action.value) match = allowed[i];
     }
-    if (!match) return bad("現在還不能做這個乘除。目標仍是一邊只剩未知箱，另一邊只剩一個數。乘除不要用拖曳。");
+    if (!match) return bad("現在還不能做這個乘除。目標仍是一邊只剩未知數，另一邊只剩一個數。乘除不要用拖曳。");
     factor = action.value;
     next = { L: [], R: [] };
     ["L", "R"].forEach(function (name) {
@@ -787,7 +807,10 @@
   }
 
   function answerPurpose(run, choice) {
-    if (Number(choice) !== PURPOSE.answer) return { ok: false, message: PURPOSE.wrong };
+    var index = Number(choice);
+    if (index !== PURPOSE.answer) {
+      return { ok: false, message: PURPOSE.wrongs[index] || "還不是。請再看這一項在說甚麼。" };
+    }
     run.goalSet = true;
     return { ok: true, message: PURPOSE.right };
   }
@@ -797,7 +820,7 @@
     var reached = isSolvedForm(run.sides);
     if (!run.goalSet) return { ok: false, message: "請先回答：我們想把方程變成甚麼樣子？" };
     if (!reached && yes) {
-      return { ok: true, reached: false, affirmed: false, message: "還沒有。一邊仍然不是只剩未知箱，或另一邊不是只剩一個數。請再看方程，自己選下一步。" };
+      return { ok: true, reached: false, affirmed: false, message: "還沒有。一邊仍然不是只剩未知數，或另一邊不是只剩一個數。請再看方程，自己選下一步。" };
     }
     if (!reached && !yes) {
       return { ok: true, reached: false, affirmed: false, message: "好。目標尚未達到，請繼續自己選下一步。" };
@@ -806,7 +829,7 @@
       run.goalAffirmed = true;
       return { ok: true, reached: true, affirmed: true, message: "對。一邊只剩 x，另一邊只剩一個數。可以按完成，再代入原式。" };
     }
-    return { ok: true, reached: true, affirmed: false, message: "請再觀察現在的方程。若一邊只剩未知箱、另一邊只剩一個數，就是達到目標。再確認一次。" };
+    return { ok: true, reached: true, affirmed: false, message: "請再觀察現在的方程。若一邊只剩未知數、另一邊只剩一個數，就是達到目標。再確認一次。" };
   }
 
   function finishGate(run) {
@@ -966,8 +989,8 @@
   }
 
   function lampHelp(id) {
-    if (id === "merge") return "同色的項可以合成一項。例如：把同類項合併：3x − x = 2x。同一題可以合併多次。未知箱和砝碼顏色不同，不能合併。";
-    if (id === "move") return "移項是兩邊同加或同減，包括未知箱。拖走一項之後，另一盤放下相反項。例如：兩邊同減 4x。";
+    if (id === "merge") return "同色的項可以合成一項。例如：把同類項合併：3x − x = 2x。同一題可以合併多次。未知數和砝碼顏色不同，不能合併。";
+    if (id === "move") return "移項是兩邊同加或同減，包括未知數。拖走一項之後，另一盤放下相反項。例如：兩邊同減 4x。";
     if (id === "divide") return "除數是兩邊同乘或同除，請按按鈕，不要拖。係數是負數時，除數也用負數，例如兩邊同除以這個負係數。";
     return "";
   }
@@ -1139,7 +1162,9 @@
     var step = ENTRY_STEPS[stepIndex];
     var index = Number(choice);
     if (!step) return { ok: false, message: "沒有這一問。" };
-    if (index !== step.answer) return { ok: false, message: step.wrong };
+    if (index !== step.answer) {
+      return { ok: false, message: (step.wrongs && step.wrongs[index]) || "還不是。請再看這個選項在說甚麼。" };
+    }
     return { ok: true, message: step.right, done: stepIndex === ENTRY_STEPS.length - 1 };
   }
 
@@ -1188,7 +1213,7 @@ function answerWarmup(session, saidCan) {
   if (said !== item.can) {
     pen = penalize(session, "熱身辨認");
     if (item.can) {
-      message = "這兩項都是未知箱，可以合併。";
+      message = "這兩項都是未知數，可以合併。";
       if (item.reveal) message += item.expr + " 寫成 " + item.reveal + "，合併得 " + item.merged + "。";
       else message += "合併得 " + item.merged + "。";
       return { ok: false, message: message + pen, checkLines: [], alarm: false, score: session.score };
@@ -1200,14 +1225,14 @@ function answerWarmup(session, saidCan) {
     return {
       ok: false,
       alarm: true,
-      message: "未知箱同砝碼唔係同類項，唔可以合併。" + pen,
+      message: "未知數同砝碼唔係同類項，唔可以合併。" + pen,
       checkLines: lines,
       score: session.score,
     };
   }
   message = item.can
     ? "可以合併，得到 " + item.merged + "。" + (item.reveal ? item.expr + " 先看成 " + item.reveal + "。" : "")
-    : "不可以合併。未知箱和砝碼不是同類項。";
+    : "不可以合併。未知數和砝碼不是同類項。";
   session.locked = true;
   session.lockMessage = message;
   return {
@@ -1238,7 +1263,12 @@ function advanceWarmup(session) {
         choices: [plan.removeLabel, plan.placeLabel, bare, decoy],
         answer: 1,
         right: "對，放下的是相反項。",
-        wrong: "看另一盤新出現的那一項，它和被拿走的項是相反項。",
+        wrongs: [
+          "這仍是原來的項。請看另一盤新放下的符號。",
+          "",
+          "這只是一個數，不是這一項過到另一盤之後的樣子。",
+          "這一步不是乘除。請先看另一盤新放下的是甚麼。",
+        ],
       },
       think: {
         ask: "呢一步其實等價於對兩邊做咗咩？",
@@ -1250,7 +1280,12 @@ function advanceWarmup(session) {
         ],
         answer: 1,
         right: "對，這一步就是" + plan.note + "。",
-        wrong: "原盤的項消失，是因為兩邊同時減去了它。若原項是負的，就是兩邊同時加上它的絕對值。",
+        wrongs: [
+          "直接搬過去之後，天平還平衡嗎？試試兩邊同時減去這一項。",
+          "",
+          "兩邊仍有 x。就算兩邊同除，也不能令一邊只剩 x。",
+          "只刪掉一邊的項，另一邊沒有同時改變，天平不再平衡。",
+        ],
       },
       wonder: {
         ask: "點解唔可以直接「搬過去」而唔變號？",
@@ -1262,7 +1297,12 @@ function advanceWarmup(session) {
         ],
         answer: 1,
         right: "對。相反項記錄的是兩邊同加或同減，不是單獨把一項搬過去。",
-        wrong: "如果兩邊的改變不一樣，天平就不會保持平衡。",
+        wrongs: [
+          "直接搬過去之後，天平還平衡嗎？試試兩邊同時減去這一項。",
+          "",
+          "未知數不一定是負數。先看這一項離開原盤之後，另一盤放下甚麼。",
+          "這一問還未到乘除。先弄清楚兩邊有沒有同時加減。",
+        ],
       },
     };
   }
@@ -1280,7 +1320,9 @@ function advanceWarmup(session) {
     var part = full[step];
     var index = Number(choice);
     if (!part) return { ok: false, message: "沒有這一問。" };
-    if (index !== part.answer) return { ok: false, message: part.wrong };
+    if (index !== part.answer) {
+      return { ok: false, message: (part.wrongs && part.wrongs[index]) || "還不是。請再看這個選項。" };
+    }
     return { ok: true, message: part.right, done: step === "wonder" };
   }
 

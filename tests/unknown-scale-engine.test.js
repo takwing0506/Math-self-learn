@@ -317,7 +317,27 @@ check("student-facing sources drop the old move-across copy", () => {
   assert.strictEqual(blob.indexOf("pointerdown"), -1);
   assert.strictEqual(blob.indexOf("黃虛線"), -1);
   assert.strictEqual(blob.indexOf("is-guide"), -1);
+  assert.strictEqual(blob.indexOf("未知箱"), -1);
+  assert.strictEqual(blob.indexOf("#f8d4cc"), -1);
+  assert.ok(blob.indexOf("目標是一邊只剩 x，應做甚麼呢？") !== -1);
+  assert.ok(blob.indexOf("token-x.neg") !== -1);
   assert.strictEqual(typeof E.moveTerm, "undefined");
+});
+
+check("each wrong purpose choice has its own feedback", () => {
+  const run = E.createRun(0, "practice");
+  const messages = [0, 1, 3].map((index) => {
+    const result = E.answerPurpose(run, index);
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(E.view(run).goalSet, false);
+    return result.message;
+  });
+  assert.strictEqual(new Set(messages).size, 3);
+  messages.forEach((message) => {
+    assert.strictEqual(message.indexOf("一邊只剩未知數（x）"), -1);
+  });
+  assert.strictEqual(E.answerPurpose(run, 2).ok, true);
+  assert.notStrictEqual(E.answerPurpose(E.createRun(0, "challenge"), 0).message, E.answerPurpose(E.createRun(0, "challenge"), 1).message);
 });
 
 console.log(passed + " passed");

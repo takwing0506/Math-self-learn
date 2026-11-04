@@ -91,6 +91,21 @@ function correctChoice(grader) {
   return found[0];
 }
 
+check("each wrong purpose and move choice has its own feedback", () => {
+  const run = E.createRun(0, "practice");
+  const purposeMessages = [0, 1, 3].map((index) => E.answerPurpose(run, index).message);
+  assert.strictEqual(new Set(purposeMessages).size, 3);
+  purposeMessages.forEach((message) => assert.strictEqual(message.indexOf("一邊只剩未知數（x）"), -1));
+  const trap = E.createRun(1, "trap");
+  const plan = E.planMove(trap, E.view(trap).tokens.R[0].id);
+  ["see", "think", "wonder"].forEach((step) => {
+    const wrongs = [0, 2, 3].map((index) => E.gradeInquiry(plan, step, index).message);
+    assert.strictEqual(new Set(wrongs).size, 3, step + " " + wrongs.join(" | "));
+    if (step === "think") assert.ok(wrongs[1].indexOf("兩邊同除") !== -1 || wrongs[1].indexOf("仍有 x") !== -1);
+    if (step === "wonder") assert.ok(wrongs[0].indexOf("搬過去") !== -1);
+  });
+});
+
 check("motto, lamps, and counts", () => {
   assert.strictEqual(E.motto, "只有加減項先移項變號；乘除唔好移。");
   assert.strictEqual(E.lamps.merge.name, "合併");
@@ -153,7 +168,7 @@ check("warmup identify and the unlike-term phrase", () => {
   assert.strictEqual(wrong.ok, false);
   assert.strictEqual(fresh.score, 90);
   assert.strictEqual(fresh.index, 0);
-  assert.ok(wrong.message.indexOf("未知箱同砝碼唔係同類項，唔可以合併") !== -1);
+  assert.ok(wrong.message.indexOf("未知數同砝碼唔係同類項，唔可以合併") !== -1);
   assert.ok(wrong.checkLines.join("\n").indexOf("x = 1") !== -1);
   assert.ok(wrong.checkLines.join("\n").indexOf("是 5") !== -1);
   assert.ok(wrong.checkLines.join("\n").indexOf("是 8") !== -1);
@@ -274,7 +289,7 @@ check("unlike colours are refused and the lamp turns red", () => {
   assert.strictEqual(E.classifyDrop(run, box.id, { kind: "term", id: weight.id }).kind, "refuse");
   const refused = E.applyDrop(run, box.id, { kind: "term", id: weight.id });
   assert.strictEqual(refused.ok, false);
-  assert.strictEqual(refused.message, "未知箱同砝碼唔係同類項，唔可以合併。");
+  assert.strictEqual(refused.message, "未知數同砝碼唔係同類項，唔可以合併。");
   assert.ok(refused.checkLines[0].indexOf("x = 1") !== -1);
   assert.ok(refused.checkLines[0].indexOf("是 8") !== -1);
   assert.ok(refused.checkLines[1].indexOf("x = 2") !== -1);
@@ -419,7 +434,7 @@ check("merge can light more than once, and divide is not a drag", () => {
   openRun(early);
   const refused = E.applyScale(early, { type: "div", value: 2 });
   assert.strictEqual(refused.ok, false);
-  assert.ok(refused.message.indexOf("一邊只剩未知箱") !== -1);
+  assert.ok(refused.message.indexOf("一邊只剩未知數") !== -1);
   assert.ok(refused.message.indexOf("乘除不要用拖曳") !== -1);
 });
 
@@ -494,6 +509,10 @@ check("consolidate prompt and student-facing sources", () => {
   assert.strictEqual(blob.indexOf(FORBIDDEN), -1);
   assert.strictEqual(blob.indexOf("黃虛線"), -1);
   assert.strictEqual(blob.indexOf("is-guide"), -1);
+  assert.strictEqual(blob.indexOf("未知箱"), -1);
+  assert.strictEqual(blob.indexOf("#f8d4cc"), -1);
+  assert.ok(blob.indexOf("目標是一邊只剩 x，應做甚麼呢？") !== -1);
+  assert.ok(blob.indexOf(".token-x.neg") !== -1);
   assert.ok(blob.indexOf("unknown-scale-like-terms/") !== -1);
   assert.ok(blob.indexOf("unknown-scale/") !== -1);
   assert.ok(fs.readFileSync(path.join(__dirname, "..", "form1/unknown-scale/js/engine.js"), "utf8").indexOf("pointerdown") === -1);
