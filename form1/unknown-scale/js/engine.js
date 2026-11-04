@@ -234,13 +234,18 @@
     ask: "我們想把方程變成甚麼樣子？",
     choices: [
       "兩邊的數字一樣大就好。",
-      "先把未知箱乘開。",
-      "一邊只剩未知箱（x），另一邊只剩一個數。",
+      "先把未知數乘開。",
+      "一邊只剩未知數（x），另一邊只剩一個數。",
       "把所有項都刪掉。",
     ],
     answer: 2,
     right: "對。目標是一邊只剩 x，另一邊只剩一個數。寫成 x＝一個數，或一個數＝x，都算達到。",
-    wrong: "還不是。再想：解完之後，未知箱應該單獨留在一邊，另一邊只剩一個數。",
+    wrongs: [
+      "兩邊數字一樣大，未知數仍可能留在兩邊，方程還未解完。",
+      "先把未知數乘開，並不能令它單獨留在一邊。",
+      "",
+      "把項刪掉會改變方程，天平兩邊不再相等。",
+    ],
   };
   var GOAL_ASK = "有達到目標嗎？";
 
@@ -259,11 +264,11 @@
     var step;
     if (run.mode !== "practice" || !run.goalSet) return "";
     step = hint(run);
-    if (!step || step.type === "check") return "現在是不是一邊只剩未知箱，另一邊只剩一個數？";
+    if (!step || step.type === "check") return "現在是不是一邊只剩未知數，另一邊只剩一個數？";
     if (step.type === "simplify") return "兩邊有沒有可以合成的同類項？";
-    if (step.type === "div" || step.type === "mul") return "未知箱的係數是不是 1？";
-    if (step.type === "addx") return "方程裡還有負的未知箱嗎？";
-    if (step.type === "add") return "有未知箱的那邊，是否還有砝碼？";
+    if (step.type === "div" || step.type === "mul") return "未知數的係數是不是 1？";
+    if (step.type === "addx") return "方程裡還有負的未知數嗎？";
+    if (step.type === "add") return "有未知數的那邊，是否還有砝碼？";
     return "";
   }
 
@@ -458,7 +463,10 @@
   }
 
   function answerPurpose(run, choice) {
-    if (Number(choice) !== PURPOSE.answer) return { ok: false, message: PURPOSE.wrong };
+    var index = Number(choice);
+    if (index !== PURPOSE.answer) {
+      return { ok: false, message: PURPOSE.wrongs[index] || "還不是。請再看這一項在說甚麼。" };
+    }
     run.goalSet = true;
     return { ok: true, message: PURPOSE.right };
   }
@@ -468,7 +476,7 @@
     var reached = isReady(run.sides);
     if (!run.goalSet) return { ok: false, message: "請先回答：我們想把方程變成甚麼樣子？" };
     if (!reached && yes) {
-      return { ok: true, reached: false, affirmed: false, message: "還沒有。一邊仍然不是只剩未知箱，或另一邊不是只剩一個數。請再看方程，自己選下一步。" };
+      return { ok: true, reached: false, affirmed: false, message: "還沒有。一邊仍然不是只剩未知數，或另一邊不是只剩一個數。請再看方程，自己選下一步。" };
     }
     if (!reached && !yes) {
       return { ok: true, reached: false, affirmed: false, message: "好。目標尚未達到，請繼續自己選下一步。" };
@@ -477,12 +485,12 @@
       run.goalAffirmed = true;
       return { ok: true, reached: true, affirmed: true, message: "對。一邊只剩 x，另一邊只剩一個數。可以進入複秤。" };
     }
-    return { ok: true, reached: true, affirmed: false, message: "請再觀察現在的方程。若一邊只剩未知箱、另一邊只剩一個數，就是達到目標。再確認一次。" };
+    return { ok: true, reached: true, affirmed: false, message: "請再觀察現在的方程。若一邊只剩未知數、另一邊只剩一個數，就是達到目標。再確認一次。" };
   }
 
   function gateCheck(run) {
     if (!run.goalSet) return { ok: false, message: "請先回答：我們想把方程變成甚麼樣子？" };
-    if (!isReady(run.sides)) return { ok: false, message: "還沒有達到目標。一邊要只剩未知箱，另一邊只剩一個數。" };
+    if (!isReady(run.sides)) return { ok: false, message: "還沒有達到目標。一邊要只剩未知數，另一邊只剩一個數。" };
     if (!run.goalAffirmed) return { ok: false, message: "請先回答：有達到目標嗎？" };
     return { ok: true, message: "" };
   }
