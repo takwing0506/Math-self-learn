@@ -318,6 +318,8 @@ check("student-facing sources drop the old move-across copy", () => {
   assert.strictEqual(blob.indexOf("黃虛線"), -1);
   assert.strictEqual(blob.indexOf("is-guide"), -1);
   assert.strictEqual(blob.indexOf("未知箱"), -1);
+  assert.strictEqual(blob.indexOf("1x"), -1);
+  assert.strictEqual(blob.indexOf(MINUS + "1x"), -1);
   assert.strictEqual(blob.indexOf("#f8d4cc"), -1);
   assert.ok(blob.indexOf("目標是一邊只剩 x，應做甚麼呢？") !== -1);
   assert.ok(blob.indexOf("token-x.neg") !== -1);
