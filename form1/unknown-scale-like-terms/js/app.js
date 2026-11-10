@@ -19,7 +19,6 @@
   var fx = null;
   var selectedId = null;
   var shakeIds = [];
-  var showOne = false;
   var checkDraft = "";
   var checkView = null;
   var focusCheck = false;
@@ -33,7 +32,6 @@
   var pointerAt = 0;
   var ghost = null;
   var timers = [];
-  var coachTimer = 0;
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var ASK_ORDER = { see: "think", think: "wonder" };
   var ASK_LABEL = { see: "觀察", think: "思考", wonder: "追問" };
@@ -122,8 +120,8 @@
     var kicker = t.type === "x" ? "<small>x</small>" : "";
     return '<span class="' + cls + '" aria-hidden="true">' + kicker + "<b>" + esc(t.label) + "</b></span>";
   }
-  function liveToken(t, displayOne) {
-    var label = displayOne ? t.labelOne : t.label;
+  function liveToken(t) {
+    var label = t.label;
     var cls = ["token", t.type === "x" ? "token-x" : "token-w"];
     if (t.neg) cls.push("neg");
     if (t.fresh) cls.push("arrive");
@@ -248,9 +246,8 @@
   }
   function renderWarmup() {
     var v = Engine.warmupView(warm);
-    var showReveal = !!v.reveal;
     var tokens = v.terms.map(function (t) {
-      var label = showReveal ? t.labelOne : t.label;
+      var label = t.label;
       var cls = "token " + (t.type === "x" ? "token-x" : "token-w") + (t.neg ? " neg" : "");
       var kicker = t.type === "x" ? "<small>x</small>" : "";
       return '<span class="' + cls + '">' + kicker + "<b>" + esc(label) + "</b></span>";
@@ -268,7 +265,6 @@
       '<p class="score">本單 <b>' + v.score + "</b> 分</p></div>" +
       "<h2>這兩項可合併嗎？</h2>" +
       '<p class="expr">' + esc(v.expr) + "</p>" +
-      (v.reveal ? '<p class="fine">' + esc(v.expr) + " 寫成 " + esc(v.reveal) + "，係數 1 先看得見。</p>" : "") +
       '<div class="tokens">' + tokens + "</div>" +
       feedbackHtml() +
       actions +
@@ -295,7 +291,7 @@
     if (fx && (fx.phase === "place" || fx.phase === "ask")) return Engine.view(run, { preview: fx.plan });
     return Engine.view(run);
   }
-  function scaleHtml(v, displayOne) {
+  function scaleHtml(v) {
     var shownBanner = "";
     if (fx && fx.phase === "leave") shownBanner = "拿走 " + fx.plan.removeLabel;
     else if (fx && (fx.phase === "place" || fx.phase === "ask")) shownBanner = fx.plan.banner;
@@ -307,7 +303,7 @@
     var cls = "scale" + (settle || fx ? " is-sync" : "") + (fx || !v.goalSet || askingGoal ? " is-locked" : "");
     function pan(side) {
       var tokens = v.tokens[side];
-      var inner = tokens.length ? tokens.map(function (t) { return liveToken(t, displayOne); }).join("") : '<span class="empty">空</span>';
+      var inner = tokens.length ? tokens.map(function (t) { return liveToken(t); }).join("") : '<span class="empty">空</span>';
       var name = side === "L" ? "左盤" : "右盤";
       return '<div class="pan pan-' + side.toLowerCase() + '" data-pan="' + side + '" tabindex="0" aria-label="' + name + '">' +
         '<p class="pan-name">' + name + '</p><div class="tokens">' + inner + "</div></div>";
@@ -363,8 +359,7 @@
   }
   function renderSolve() {
     var v = currentView();
-    var displayOne = !!(v.unitCoach && (showOne || (fx && fx.phase !== "leave")));
-    var eq = displayOne && v.equationOne !== v.equation ? v.equationOne : v.equation;
+    var eq = v.equation;
     var eqCls = "expr" + (v.previewing ? " preview" : "");
     var tag = v.previewing ? '<span class="preview-tag">預覽，尚未寫入</span>' : "";
     return (
@@ -377,8 +372,7 @@
       '<p class="motto slim">' + esc(v.motto) + "</p>" +
       lampButtons(v) +
       '<p class="' + eqCls + '" id="equation">' + tag + esc(eq) + "</p>" +
-      (displayOne && v.unitCoach ? '<p class="fine">' + esc(v.unitCoach) + "</p>" : "") +
-      scaleHtml(v, displayOne) +
+      scaleHtml(v) +
       feedbackHtml() +
       actionHtml(v) +
       stepList(v, false) +
@@ -499,20 +493,8 @@
     } else if (scrollY) window.scrollTo(0, scrollY);
   }
 
-  function armCoach() {
-    window.clearTimeout(coachTimer);
-    if (!run || screen !== "solve") { showOne = false; return; }
-    var v = Engine.view(run);
-    if (!v.unitCoach) { showOne = false; return; }
-    showOne = true;
-    coachTimer = window.setTimeout(function () {
-      showOne = false;
-      if (!press && !fx && screen === "solve") render();
-    }, reduceMotion ? 0 : 2200);
-  }
   function startMission(index) {
     clearTimers();
-    window.clearTimeout(coachTimer);
     run = Engine.createRun(index, mode);
     screen = "solve";
     fx = null;
@@ -528,7 +510,6 @@
       kind: "info",
       text: "先回答這題想把方程變成甚麼樣子。同色才可以合併。",
     };
-    armCoach();
     render();
   }
   function goHub() {
@@ -560,7 +541,6 @@
       banner = result.banner;
       settle = true;
       render();
-      armCoach();
       later(function () {
         settle = false;
         banner = "";
@@ -572,7 +552,6 @@
     banner = "";
     settle = false;
     render();
-    if (result.ok) armCoach();
   }
   function startMove(id) {
     var plan = Engine.planMove(run, id);

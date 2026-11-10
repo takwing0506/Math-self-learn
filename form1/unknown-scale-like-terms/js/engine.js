@@ -101,7 +101,7 @@
     {
       expr: "3x − x",
       can: true,
-      reveal: "3x − 1x",
+      reveal: "",
       merged: "2x",
       terms: [["x", 3], ["x", -1]],
     },
@@ -239,46 +239,40 @@
     return out;
   }
 
-  function formatTerm(t, index, showOne) {
+  function formatTerm(t, index) {
     var c = t.coeff;
     var body;
-    var mag;
-    var pos;
     if (t.type === "x") {
-      if (c === 1) body = showOne ? "1x" : "x";
-      else if (c === -1) body = showOne ? "−1x" : "−x";
+      if (c === 1) body = "x";
+      else if (c === -1) body = "−x";
       else body = fmtInt(c) + "x";
       if (index === 0) return body;
-      if (c < 0) {
-        mag = c === -1 ? (showOne ? "1x" : "x") : Math.abs(c) + "x";
-        return " − " + mag;
-      }
-      pos = c === 1 ? (showOne ? "1x" : "x") : c + "x";
-      return " + " + pos;
+      if (c < 0) return " − " + (c === -1 ? "x" : Math.abs(c) + "x");
+      return " + " + (c === 1 ? "x" : c + "x");
     }
     if (index === 0) return fmtInt(c);
     return c < 0 ? " − " + Math.abs(c) : " + " + c;
   }
 
-  function formatSide(terms, showOne) {
+  function formatSide(terms) {
     if (!terms.length) return "0";
     var out = "";
     var i;
-    for (i = 0; i < terms.length; i += 1) out += formatTerm(terms[i], i, !!showOne);
+    for (i = 0; i < terms.length; i += 1) out += formatTerm(terms[i], i);
     return out;
   }
 
-  function formatEq(sides, showOne) {
-    return formatSide(sides.L, showOne) + " = " + formatSide(sides.R, showOne);
+  function formatEq(sides) {
+    return formatSide(sides.L) + " = " + formatSide(sides.R);
   }
 
   function formatValue(type, coeff) {
     if (coeff === 0) return "0";
-    return formatTerm({ type: type, coeff: coeff }, 0, false);
+    return formatTerm({ type: type, coeff: coeff }, 0);
   }
 
   function formatPair(first, second) {
-    return formatTerm(first, 0, false) + formatTerm(second, 1, false);
+    return formatTerm(first, 0) + formatTerm(second, 1);
   }
 
   function tokenLabel(t) {
@@ -288,11 +282,6 @@
       return fmtInt(t.coeff) + "x";
     }
     return fmtInt(t.coeff);
-  }
-
-  function explicitLabel(t) {
-    if (t.type !== "x" || Math.abs(t.coeff) !== 1) return tokenLabel(t);
-    return t.coeff === 1 ? "1x" : "−1x";
   }
 
   function magLabel(t) {
@@ -431,7 +420,7 @@
   function formAdvice(sides) {
     var eq;
     if (isSolvedForm(sides)) return { ok: true, message: "" };
-    eq = formatEq(sides, false);
+    eq = formatEq(sides);
     if (hasPair(sides.L) || hasPair(sides.R)) {
       return { ok: false, message: "還沒有達到目標。現在是 " + eq + "。一邊要只剩未知數 x，另一邊只剩一個數。" };
     }
@@ -481,25 +470,6 @@
       "代入 x = 2，合起來是 " + fmtInt(v2) + "。",
       "兩次結果不同，所以不是同類項。",
     ];
-  }
-
-  function unitCoach(sides) {
-    var names = ["L", "R"];
-    var i;
-    var j;
-    var terms;
-    var xs;
-    var hasOne;
-    for (i = 0; i < names.length; i += 1) {
-      terms = sides[names[i]];
-      xs = xTerms(terms);
-      hasOne = false;
-      for (j = 0; j < xs.length; j += 1) if (Math.abs(xs[j].coeff) === 1) hasOne = true;
-      if (xs.length >= 2 && hasOne) {
-        return formatSide(terms, false) + " 寫成 " + formatSide(terms, true) + "，係數 1 先看得見。";
-      }
-    }
-    return "";
   }
 
   function hint(run) {
@@ -599,7 +569,7 @@
     run.alarm = "";
     pushHistory(run);
     run.sides = nextSides;
-    eq = formatEq(run.sides, false);
+    eq = formatEq(run.sides);
     run.steps.push({ equation: eq, lamp: lamp, note: note });
     now = idsOf(run.sides);
     for (i = 0; i < now.length; i += 1) if (!prev[now[i]]) fresh.push(now[i]);
@@ -656,7 +626,7 @@
       placeLabel: signedLabel(placed),
       note: note,
       banner: note,
-      equation: formatEq(next, false),
+      equation: formatEq(next),
       sides: next,
       narration: fromName + "拿走 " + signedLabel(term) + "，" + toName + "放下 " + signedLabel(placed) + "。",
     };
@@ -1016,7 +986,6 @@
           type: t.type,
           side: side,
           label: tokenLabel(t),
-          labelOne: explicitLabel(t),
           neg: t.coeff < 0,
           fresh: !!fresh[t.id] || t.id === "pv",
           leaving: options.leavingId === t.id,
@@ -1041,11 +1010,9 @@
       setLabel: setLabel(run.mode),
       score: run.score,
       motto: MOTTO,
-      equation: formatEq(sides, false),
-      equationOne: formatEq(sides, true),
-      officialEquation: formatEq(run.sides, false),
-      originalEquation: formatEq(run.original, false),
-      unitCoach: unitCoach(sides),
+      equation: formatEq(sides),
+      officialEquation: formatEq(run.sides),
+      originalEquation: formatEq(run.original),
       previewing: !!preview,
       steps: run.steps.map(function (step) {
         return { equation: step.equation, lamp: step.lamp, note: step.note };
@@ -1110,7 +1077,7 @@
       score: 100,
       misses: [],
       history: [],
-      steps: [{ equation: formatEq(sides, false), lamp: null, note: "原式" }],
+      steps: [{ equation: formatEq(sides), lamp: null, note: "原式" }],
       freshIds: [],
       freshLamp: "",
       alarm: "",
@@ -1138,7 +1105,7 @@
         return { type: t.type, label: tokenLabel(t), neg: t.coeff < 0 };
       });
     }
-    return { eq: formatEq(sides, false), L: paint(sides.L), R: paint(sides.R) };
+    return { eq: formatEq(sides), L: paint(sides.L), R: paint(sides.R) };
   }
 
   function publicEntry() {
@@ -1173,7 +1140,6 @@
     return {
       type: t.type,
       label: tokenLabel(t),
-      labelOne: explicitLabel(t),
       neg: t.coeff < 0,
     };
   }
@@ -1214,8 +1180,7 @@ function answerWarmup(session, saidCan) {
     pen = penalize(session, "熱身辨認");
     if (item.can) {
       message = "這兩項都是未知數，可以合併。";
-      if (item.reveal) message += item.expr + " 寫成 " + item.reveal + "，合併得 " + item.merged + "。";
-      else message += "合併得 " + item.merged + "。";
+      message += "合併得 " + item.merged + "。";
       return { ok: false, message: message + pen, checkLines: [], alarm: false, score: session.score };
     }
     lines = unlikeLines(
@@ -1231,7 +1196,7 @@ function answerWarmup(session, saidCan) {
     };
   }
   message = item.can
-    ? "可以合併，得到 " + item.merged + "。" + (item.reveal ? item.expr + " 先看成 " + item.reveal + "。" : "")
+    ? "可以合併，得到 " + item.merged + "。"
     : "不可以合併。未知數和砝碼不是同類項。";
   session.locked = true;
   session.lockMessage = message;
