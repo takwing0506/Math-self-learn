@@ -300,6 +300,7 @@
       ? '<div class="sync-label">' + esc(shownBanner) + "</div>"
       : '<div class="sync-label equals" aria-hidden="true">＝</div>';
     var status = fx ? fx.plan.narration : v.ready ? "一邊只剩未知數，另一邊只剩一個數。" : "天平保持平衡。";
+    var cue = v.scaleCue ? '<p class="merge-cue">' + esc(v.scaleCue) + "</p>" : "";
     var cls = "scale" + (settle || fx ? " is-sync" : "") + (fx || !v.goalSet || askingGoal ? " is-locked" : "");
     function pan(side) {
       var tokens = v.tokens[side];
@@ -308,7 +309,7 @@
       return '<div class="pan pan-' + side.toLowerCase() + '" data-pan="' + side + '" tabindex="0" aria-label="' + name + '">' +
         '<p class="pan-name">' + name + '</p><div class="tokens">' + inner + "</div></div>";
     }
-    return '<div class="' + cls + '" id="scale">' +
+    return '<div class="' + cls + '" id="scale">' + cue +
       '<div class="pans">' + pan("L") + '<div class="mid">' + mid + "</div>" + pan("R") + "</div>" +
       '<div class="beam"></div><div class="pivot" aria-hidden="true"></div>' +
       '<div class="stand" aria-hidden="true"></div><div class="foot" aria-hidden="true"></div>' +
@@ -332,20 +333,23 @@
         '<div class="btn-row nav-row"><button type="button" class="btn btn-ghost" data-act="undo"' +
         (v.canUndo ? "" : " disabled") + ">返回上一步</button></div></div>";
     }
-    note = v.look ? '<p class="fine">' + esc(v.look) + "</p>" : "";
+    note = !v.canMerge && v.look ? '<p class="fine">' + esc(v.look) + "</p>" : "";
     if (v.mode === "trap") note += '<p class="fine">只可合併同色的項。</p>';
     var ops = v.actions.length
       ? '<div class="btn-row">' + v.actions.map(function (action) {
         return '<button type="button" class="btn op-btn btn-ghost" data-act="op" data-type="' + esc(action.type) +
           '" data-value="' + esc(String(action.value)) + '">' + esc(action.label) + "</button>";
       }).join("") + "</div>"
-      : '<p class="fine">乘除用按鈕。係數還不是 1 時，按鈕才會出現。</p>';
-    return '<div class="action-card"><h3>兩邊一起</h3>' +
-      '<p class="goal-prompt">目標是一邊只剩 x，應做甚麼呢？</p>' + note + ops +
+      : (v.canMerge ? "" : '<p class="fine">乘除用按鈕。係數還不是 1 時，按鈕才會出現。</p>');
+    var foot = v.canMerge
+      ? "也可以先點選一項，再點另一個同色的項。"
+      : "拖曳，或先點選再點目標。同色合併；拖到另一盤是兩邊同加或同減。";
+    return '<div class="action-card"><h3>' + esc(v.deskHeading) + "</h3>" +
+      '<p class="goal-prompt">' + esc(v.deskPrompt) + "</p>" + note + ops +
       '<div class="btn-row nav-row">' +
       '<button type="button" class="btn btn-ghost" data-act="finish">完成</button>' +
       '<button type="button" class="btn btn-ghost" data-act="undo"' + (v.canUndo ? "" : " disabled") + ">返回上一步</button>" +
-      "</div><p class=\"fine\">拖曳，或先點選再點目標。同色合併；拖到另一盤是兩邊同加或同減。</p></div>";
+      "</div><p class=\"fine\">" + foot + "</p></div>";
   }
   function inquiryHtml() {
     var inquiry = Engine.moveInquiry(fx.plan);
