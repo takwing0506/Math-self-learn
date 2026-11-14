@@ -104,6 +104,13 @@ check("practice and challenge are different questions", () => {
   practice.forEach((eq) => assert.strictEqual(challenge.indexOf(eq), -1));
   assert.strictEqual(E.view(E.createRun(0, "practice")).total, 5);
   assert.strictEqual(E.view(E.createRun(0, "challenge")).total, 3);
+  function noSignedTools(run) {
+    const labels = E.view(run).actions.map((action) => action.label);
+    assert.strictEqual(labels.indexOf("兩邊都加 x"), -1);
+    assert.strictEqual(labels.indexOf("兩邊同乘 −1"), -1);
+  }
+  PRACTICE.forEach((_, index) => noSignedTools(E.createRun(index, "practice")));
+  noSignedTools(E.createRun(0, "challenge"));
 });
 
 check("opening text does not reveal answers or old lamps", () => {
@@ -205,21 +212,29 @@ check("challenge A constant first", () => {
   finish(run, -3, ["move"]);
 });
 
-check("challenge B uses divide or multiply by −1, never moving −x", () => {
-  const run = E.createRun(1, "challenge");
+function bothPaths(run) {
   const labels = E.view(run).actions.map((action) => action.label);
+  assert.ok(labels.indexOf("兩邊都加 x") !== -1);
+  assert.ok(labels.indexOf("兩邊都減 x") !== -1);
   assert.ok(labels.indexOf("兩邊同乘 −1") !== -1);
   assert.ok(labels.indexOf("兩邊同除以 −1") !== -1);
-  assert.ok(labels.indexOf("兩邊都加 x") === -1);
+  assert.strictEqual(E.view(run).look, "");
+  assert.ok(E.view(run).brief.indexOf("係數為正") !== -1);
+  assert.ok(E.view(run).brief.indexOf("都可以") !== -1);
+  assert.strictEqual(E.view(run).brief.indexOf("請用除數燈"), -1);
+  assert.strictEqual(E.view(run).brief.indexOf("請兩邊都加 x"), -1);
+}
+
+check("challenge B accepts adding x or scaling by −1", () => {
+  const run = E.createRun(1, "challenge");
+  bothPaths(run);
   assert.strictEqual(E.view(run).lamps.find((lamp) => lamp.id === "divide").state, "need");
-  assert.ok(E.lampHelp(run, "divide").indexOf("同乘") !== -1);
   openRun(run);
-  const refused = E.applyAction(run, { type: "addx", value: 1 });
-  assert.strictEqual(refused.ok, false);
   E.applyAction(run, { type: "add", value: -6 });
   E.applyAction(run, { type: "simplify" });
   assert.strictEqual(E.view(run).equation, MINUS + "x = 4");
   assert.strictEqual(E.view(run).ready, false);
+  assert.ok(E.view(run).actions.some((action) => action.label === "兩邊同除以 −1"));
   const divided = E.applyAction(run, { type: "div", value: -1 });
   assert.strictEqual(divided.ok, true);
   assert.strictEqual(divided.banner, "兩邊 ÷ −1");
@@ -227,27 +242,28 @@ check("challenge B uses divide or multiply by −1, never moving −x", () => {
   assert.strictEqual(divided.askGoal, true);
   assert.strictEqual(E.answerGoal(run, true).affirmed, true);
   assert.deepStrictEqual(E.lampsUsed(run), ["move", "divide"]);
-  const onlyMove = E.confirmLamps(run, ["move"]);
-  assert.strictEqual(onlyMove.ok, false);
   finish(run, -4, ["move", "divide"]);
 
-  const other = E.createRun(1, "challenge");
-  openRun(other);
-  E.applyAction(other, { type: "mul", value: -1 });
-  assert.strictEqual(E.view(other).equation, "x " + MINUS + " 6 = " + MINUS + "10");
-  E.applyAction(other, { type: "add", value: 6 });
-  E.applyAction(other, { type: "simplify" });
-  assert.strictEqual(E.view(other).equation, "x = " + MINUS + "4");
-  assert.strictEqual(E.isLevel(other), true);
+  const added = E.createRun(1, "challenge");
+  openRun(added);
+  E.applyAction(added, { type: "addx", value: 1 });
+  assert.strictEqual(E.view(added).equation, MINUS + "x + 6 + x = 10 + x");
+  E.applyAction(added, { type: "simplify" });
+  assert.strictEqual(E.view(added).equation, "6 = 10 + x");
+  E.applyAction(added, { type: "add", value: -10 });
+  E.applyAction(added, { type: "simplify" });
+  assert.strictEqual(E.view(added).equation, MINUS + "4 = x");
+  assert.strictEqual(E.view(added).ready, true);
+  assert.strictEqual(E.answerGoal(added, true).affirmed, true);
+  assert.deepStrictEqual(E.lampsUsed(added), ["move"]);
+  finish(added, -4, ["move"]);
 });
 
-check("challenge C keeps −x in the middle and stays additive", () => {
+check("challenge C accepts adding x or dividing after −x = −5", () => {
   const run = E.createRun(2, "challenge");
-  assert.strictEqual(E.view(run).lamps.find((lamp) => lamp.id === "divide").state, "skip");
-  assert.ok(E.view(run).actions.some((action) => action.label === "兩邊都加 x"));
+  bothPaths(run);
+  assert.strictEqual(E.view(run).lamps.find((lamp) => lamp.id === "divide").state, "need");
   openRun(run);
-  const noDivide = E.applyAction(run, { type: "div", value: -1 });
-  assert.strictEqual(noDivide.ok, false);
   E.applyAction(run, { type: "addx", value: 1 });
   assert.strictEqual(E.view(run).equation, "9 " + MINUS + " x + x = 4 + x");
   E.applyAction(run, { type: "simplify" });
@@ -258,6 +274,19 @@ check("challenge C keeps −x in the middle and stays additive", () => {
   assert.strictEqual(E.answerGoal(run, true).affirmed, true);
   assert.deepStrictEqual(E.lampsUsed(run), ["move"]);
   finish(run, 5, ["move"]);
+
+  const scaled = E.createRun(2, "challenge");
+  openRun(scaled);
+  E.applyAction(scaled, { type: "add", value: -9 });
+  E.applyAction(scaled, { type: "simplify" });
+  assert.strictEqual(E.view(scaled).equation, MINUS + "x = " + MINUS + "5");
+  assert.strictEqual(E.view(scaled).ready, false);
+  const divided = E.applyAction(scaled, { type: "div", value: -1 });
+  assert.strictEqual(divided.ok, true);
+  assert.strictEqual(E.view(scaled).equation, "x = 5");
+  assert.strictEqual(E.answerGoal(scaled, true).affirmed, true);
+  assert.deepStrictEqual(E.lampsUsed(scaled), ["move", "divide"]);
+  finish(scaled, 5, ["move", "divide"]);
 });
 
 check("wrong fill deducts, undo does not refund, score floors at 0", () => {
