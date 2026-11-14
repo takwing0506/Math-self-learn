@@ -177,9 +177,9 @@ check("warmup identify and the unlike-term phrase", () => {
 
   const second = E.warmupView(fresh);
   assert.strictEqual(second.expr, "3x " + MINUS + " x");
-  assert.strictEqual(second.reveal, "3x " + MINUS + " 1x");
+  assert.strictEqual(second.reveal, "");
   assert.strictEqual(second.terms[1].label, MINUS + "x");
-  assert.strictEqual(second.terms[1].labelOne, MINUS + "1x");
+  assert.strictEqual(JSON.stringify(second).indexOf("1x"), -1);
   assert.strictEqual(JSON.stringify(second).indexOf("2x"), -1);
   const missed = E.answerWarmup(fresh, false);
   assert.strictEqual(missed.ok, false);
@@ -198,11 +198,12 @@ check("warmup identify and the unlike-term phrase", () => {
   assert.strictEqual(fresh.score, 80);
 });
 
-check("3x − x reveals the coefficient 1 and merges to 2x", () => {
+check("3x − x stays written without a unit coefficient and merges to 2x", () => {
   const run = E.createRun(0, "practice");
   const view = E.view(run);
-  assert.strictEqual(view.unitCoach, "3x " + MINUS + " x 寫成 3x " + MINUS + " 1x，係數 1 先看得見。");
-  assert.strictEqual(view.equationOne, "3x " + MINUS + " 1x = 8");
+  assert.strictEqual(view.equation, "3x " + MINUS + " x = 8");
+  assert.strictEqual(view.tokens.L[1].label, MINUS + "x");
+  assert.strictEqual(JSON.stringify(view).indexOf("1x"), -1);
   assert.strictEqual(view.guide, undefined);
   assert.ok(view.tokens.L.every((item) => !item.guided));
   assert.strictEqual(view.actions.length, 0);
@@ -510,6 +511,8 @@ check("consolidate prompt and student-facing sources", () => {
   assert.strictEqual(blob.indexOf("黃虛線"), -1);
   assert.strictEqual(blob.indexOf("is-guide"), -1);
   assert.strictEqual(blob.indexOf("未知箱"), -1);
+  assert.strictEqual(blob.indexOf("1x"), -1);
+  assert.strictEqual(blob.indexOf(MINUS + "1x"), -1);
   assert.strictEqual(blob.indexOf("#f8d4cc"), -1);
   assert.ok(blob.indexOf("目標是一邊只剩 x，應做甚麼呢？") !== -1);
   assert.ok(blob.indexOf(".token-x.neg") !== -1);
