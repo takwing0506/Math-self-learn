@@ -457,6 +457,10 @@
     ],
   };
   var GOAL_ASK = "有達到目標嗎？";
+  var MERGE_GUIDE = "同一邊有同色的項。把其中一項拖到另一個同色的項上，就可以合併。";
+  var MERGE_NEUTRAL = "同色的項可以拖到另一個同色的項上合併。也可以兩邊同加或同減。乘除用按鈕。";
+  var MOVE_HEADING = "兩邊一起";
+  var MOVE_PROMPT = "目標是一邊只剩 x，應做甚麼呢？";
 
   function termValue(t, x) {
     return t.type === "x" ? t.coeff * x : t.coeff;
@@ -511,11 +515,33 @@
     if (run.mode !== "practice" || !run.goalSet) return "";
     step = hint(run);
     if (!step || step.type === "finish") return "現在是不是一邊只剩未知數，另一邊只剩一個數？";
-    if (step.type === "merge") return "這一盤有沒有兩個同色的項？";
+    if (step.type === "merge") return MERGE_GUIDE;
     if (step.type === "move" && step.kind === "x") return "是不是兩邊都還有未知數？";
     if (step.type === "move") return "有未知數的那邊，是否還有砝碼？";
     if (step.type === "div" || step.type === "mul") return "未知數的係數是不是 1？";
     return "";
+  }
+
+  function canMergeSides(sides) {
+    return hasPair(sides.L) || hasPair(sides.R);
+  }
+
+  function deskCopy(run, preview) {
+    var merging = canMergeSides(run.sides);
+    var cue;
+    if (preview || !run.goalSet) {
+      return { canMerge: false, heading: "", prompt: "", scaleCue: "" };
+    }
+    if (merging) {
+      cue = run.mode === "challenge" ? MERGE_NEUTRAL : MERGE_GUIDE;
+      return {
+        canMerge: true,
+        heading: run.mode === "challenge" ? "操作" : "合併同類項",
+        prompt: cue,
+        scaleCue: cue,
+      };
+    }
+    return { canMerge: false, heading: MOVE_HEADING, prompt: MOVE_PROMPT, scaleCue: "" };
   }
 
   function scaleActions(run) {
@@ -978,6 +1004,7 @@
     var i;
     var info;
     var actions;
+    var desk;
     for (i = 0; i < run.freshIds.length; i += 1) fresh[run.freshIds[i]] = true;
     function tokens(side) {
       return sides[side].map(function (t) {
@@ -993,6 +1020,7 @@
       });
     }
     info = missionInfo(run.index, run.mode);
+    desk = deskCopy(run, !!preview);
     actions = scaleActions(run).map(function (action) {
       return {
         type: action.type,
@@ -1022,6 +1050,10 @@
       goalSet: !!run.goalSet,
       goalAffirmed: !!run.goalAffirmed,
       look: preview ? "" : lookQuestion(run),
+      canMerge: desk.canMerge,
+      deskHeading: desk.heading,
+      deskPrompt: desk.prompt,
+      scaleCue: desk.scaleCue,
       tokens: { L: tokens("L"), R: tokens("R") },
       lamps: [LAMPS.merge, LAMPS.move, LAMPS.divide].map(function (lamp) {
         var state = lampState(run, lamp.id);

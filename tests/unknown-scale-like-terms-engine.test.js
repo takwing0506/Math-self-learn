@@ -208,8 +208,18 @@ check("3x − x stays written without a unit coefficient and merges to 2x", () =
   assert.ok(view.tokens.L.every((item) => !item.guided));
   assert.strictEqual(view.actions.length, 0);
   assert.strictEqual(view.look, "");
+  assert.strictEqual(view.scaleCue, "");
   openRun(run);
-  assert.ok(E.view(run).look.indexOf("同色") !== -1);
+  const opened = E.view(run);
+  assert.strictEqual(opened.canMerge, true);
+  assert.strictEqual(opened.deskHeading, "合併同類項");
+  assert.ok(opened.scaleCue.indexOf("拖到另一個同色的項上") !== -1);
+  assert.ok(opened.deskPrompt.indexOf("就可以合併") !== -1);
+  assert.strictEqual(opened.scaleCue, opened.look);
+  assert.strictEqual(opened.scaleCue.indexOf("兩邊一起"), -1);
+  assert.strictEqual(opened.scaleCue.indexOf("應做甚麼"), -1);
+  assert.strictEqual(opened.scaleCue.indexOf("移項"), -1);
+  assert.strictEqual(opened.scaleCue.indexOf("要移"), -1);
   const before = run.nextId;
   const plan = E.planMove(run, view.tokens.L[0].id);
   assert.strictEqual(plan.ok, true);
@@ -218,6 +228,10 @@ check("3x − x stays written without a unit coefficient and merges to 2x", () =
   const merged = E.applyDrop(run, view.tokens.L[0].id, { kind: "term", id: view.tokens.L[1].id });
   assert.strictEqual(merged.ok, true);
   assert.strictEqual(E.view(run).equation, "2x = 8");
+  assert.strictEqual(E.view(run).canMerge, false);
+  assert.strictEqual(E.view(run).scaleCue, "");
+  assert.strictEqual(E.view(run).deskHeading, "兩邊一起");
+  assert.strictEqual(E.view(run).deskPrompt, "目標是一邊只剩 x，應做甚麼呢？");
   assert.strictEqual(E.view(run).steps[1].lamp, "merge");
   assert.strictEqual(E.view(run).steps[1].note, "把同類項合併：3x " + MINUS + " x = 2x");
   assert.strictEqual(merged.askGoal, true);
@@ -345,6 +359,51 @@ check("finish rejects 2x = 10, 10 = 2x, and −x = 4", () => {
   assert.strictEqual(negFour.ok, false);
   assert.ok(negFour.message.indexOf(MINUS + "4x = 4") !== -1);
   assert.ok(negFour.message.indexOf("係數還不是 1") !== -1);
+});
+
+check("same-side pairs explain the drag, and challenge does not name the terms", () => {
+  const practice = E.createRun(0, "practice");
+  openRun(practice);
+  assert.ok(E.view(practice).scaleCue.indexOf("同色") !== -1);
+
+  const bothSides = E.createRun(2, "practice");
+  openRun(bothSides);
+  assert.strictEqual(E.view(bothSides).canMerge, false);
+  assert.strictEqual(E.view(bothSides).scaleCue, "");
+  assert.strictEqual(E.view(bothSides).deskHeading, "兩邊一起");
+
+  const trap = E.createRun(2, "trap");
+  openRun(trap);
+  assert.strictEqual(E.view(trap).canMerge, true);
+  assert.strictEqual(E.view(trap).look, "");
+  assert.ok(E.view(trap).scaleCue.indexOf("拖到另一個同色的項上") !== -1);
+  assert.strictEqual(E.view(trap).scaleCue.indexOf("應做甚麼"), -1);
+
+  const named = E.createRun(2, "challenge");
+  openRun(named);
+  const cue = E.view(named).scaleCue;
+  assert.strictEqual(E.view(named).canMerge, true);
+  assert.strictEqual(E.view(named).look, "");
+  assert.strictEqual(E.view(named).deskHeading, "操作");
+  assert.ok(cue.indexOf("拖到另一個同色的項上合併") !== -1);
+  assert.ok(cue.indexOf("兩邊同加或同減") !== -1);
+  assert.ok(cue.indexOf("乘除用按鈕") !== -1);
+  assert.strictEqual(cue.indexOf("3x"), -1);
+  assert.strictEqual(cue.indexOf("4x"), -1);
+  assert.strictEqual(cue.indexOf("左盤"), -1);
+  assert.strictEqual(cue.indexOf("應做甚麼"), -1);
+  assert.strictEqual(cue.indexOf("移項"), -1);
+  const left = E.view(named).tokens.L;
+  E.applyDrop(named, left[0].id, { kind: "term", id: left[1].id });
+  assert.strictEqual(E.view(named).canMerge, false);
+  assert.strictEqual(E.view(named).scaleCue, "");
+  assert.strictEqual(E.view(named).deskHeading, "兩邊一起");
+
+  const across = E.createRun(0, "challenge");
+  openRun(across);
+  assert.strictEqual(E.view(across).canMerge, false);
+  assert.strictEqual(E.view(across).scaleCue, "");
+  assert.strictEqual(E.view(across).deskPrompt, "目標是一邊只剩 x，應做甚麼呢？");
 });
 
 check("challenge 1 reaches −1 by −4x = 4 and dividing by −4", () => {
