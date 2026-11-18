@@ -977,7 +977,7 @@
 
   function setThreeMode(w, mode) {
     var next = mode === "challenge" ? "challenge" : "practice";
-    if (w.threeMode === next) return { ok: true, message: next === "challenge" ? "而家是挑戰模式。" : "而家是引導模式。", score: w.score };
+    if (w.threeMode === next) return { ok: true, message: next === "challenge" ? "現在是挑戰模式。" : "現在是引導模式。", score: w.score };
     remember(w);
     w.threeMode = next;
     return { ok: true, message: next === "challenge" ? "已改為挑戰模式。兩種寫法都接受，畫面不會指定哪一種。" : "已改為引導模式。", score: w.score };

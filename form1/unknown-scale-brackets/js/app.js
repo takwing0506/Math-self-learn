@@ -105,23 +105,33 @@
     var wide = strips[0] ? strips[0].width : "4";
     strips.forEach(function (strip) { total += Number(strip.flex) || 0; });
     if (!total) total = 13;
+    var lengths = strips.map(function (strip) {
+      return '<div class="rect-length" style="flex:' + Number(strip.flex) + ' 1 0"><b>長 ' + esc(strip.length) + "</b></div>";
+    }).join("");
     var inner = strips.map(function (strip) {
       var cls = "strip" + (strip.omitted ? " is-omitted" : "") + (pickable && pickedRegion === strip.id ? " is-picked" : "");
       var caption = strip.caption ? "<small>" + esc(strip.caption) + "</small>" : "";
       var flag = strip.omitted ? '<span class="omit-flag">未計入</span>' : "";
       var label = "長 " + strip.length + "，闊 " + strip.width + (strip.omitted ? "，未計入" : "");
-      var body = "<b>長 " + esc(strip.length) + "</b><small>闊 " + esc(strip.width) + "</small>" + caption + flag;
       var style = "flex:" + Number(strip.flex) + " 1 0";
       if (pickable) {
         return '<button type="button" class="' + cls + '" style="' + style + '" data-act="pick-region" data-region="' +
-          esc(strip.id) + '" aria-pressed="' + (pickedRegion === strip.id ? "true" : "false") + '" aria-label="' + esc(label) + '">' + body + "</button>";
+          esc(strip.id) + '" aria-pressed="' + (pickedRegion === strip.id ? "true" : "false") + '" aria-label="' + esc(label) + '">' + caption + flag + "</button>";
       }
-      return '<div class="' + cls + '" style="' + style + '" role="img" aria-label="' + esc(label) + '">' + body + "</div>";
+      return '<div class="' + cls + '" style="' + style + '" role="img" aria-label="' + esc(label) + '">' + caption + flag + "</div>";
     }).join("");
     return '<figure class="rect-figure" style="--len:' + total + ";--wide:" + esc(wide) + '">' +
       '<div class="rect-stage">' +
+      '<div class="rect-lengths" aria-hidden="true">' + lengths + "</div>" +
       '<div class="rect-width" aria-hidden="true"><b>闊 ' + esc(wide) + "</b></div>" +
       '<div class="rect-body">' + inner + "</div></div></figure>";
+  }
+  function easySteps(step) {
+    var items = ["第 1 步：公式", "第 2 步：代入", "第 3 步：面積"];
+    return '<div class="easy-steps">' + items.map(function (label, index) {
+      var cls = index < step ? "done" : index === step ? "now" : "";
+      return '<span class="easy-step ' + cls + '">' + label + "</span>";
+    }).join("") + "</div>";
   }
   function workshopPills(phase) {
     var index = { easy: 0, hard: 1, own: 2, match: 3, three: 4, done: 4 }[phase] || 0;
@@ -163,7 +173,7 @@
     var body = "";
     if (view.phase === "easy") {
       body = rectHtml(view.strips, false) +
-        '<p class="q-no">1／3 公式 · 2／3 代入 · 3／3 面積</p>' +
+        easySteps(view.easyStep) +
         "<h2>這一個長方形的面積怎樣求？</h2>" +
         '<p class="lead">長和闊都是一位數。先寫公式，再代入數字，最後才寫面積。做完這三步才到下一題。</p>' +
         (view.easyStep > 0 ? '<p class="shared-note">面積 = 長 × 闊</p>' : "") +
@@ -197,7 +207,7 @@
         ) : "") +
         (view.stw ? (
           '<p class="shared-note">闊度 6 仍在兩塊上。</p>' +
-          '<p class="q-no">' + esc(view.stw.label) + " " + view.stw.index + "／" + view.stw.total + "</p>" +
+          '<p class="q-no">第 ' + view.stw.index + " 問：" + esc(view.stw.label) + "</p>" +
           '<p class="master">' + esc(view.stw.ask) + "</p>" +
           choiceButtons(view.stw.choices, "pick-stw", "stw-" + view.stwIndex)
         ) : "") +

@@ -495,15 +495,55 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
   border-radius: 0;
 }
 .rect-stage {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    ". lengths"
+    "width body";
+  column-gap: 8px;
+  row-gap: 4px;
   width: fit-content;
   border-radius: 0;
 }
-.rect-width {
+.rect-lengths {
+  grid-area: lengths;
+  display: flex;
+  width: calc(var(--len) * var(--u) * 1px);
+  box-sizing: border-box;
+  padding: 0 3px 2px;
+  border-radius: 0;
+}
+.rect-length {
   position: relative;
-  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 0;
+  min-height: 2.5rem;
+  padding: 0 2px 12px;
+  border-radius: 0;
+}
+.rect-length b {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.rect-length::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 9px;
+  border-left: 2px solid var(--ink);
+  border-right: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+  border-radius: 0;
+}
+.rect-width {
+  grid-area: width;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -529,6 +569,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
   border-radius: 0;
 }
 .rect-body {
+  grid-area: body;
   display: flex;
   flex: none;
   width: calc(var(--len) * var(--u) * 1px);
@@ -576,6 +617,16 @@ button.strip {
   border-radius: 0;
 }
 .omit-flag { color: var(--seal-dark); font-weight: 700; }
+.easy-steps { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.easy-step {
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: #f3eee4;
+  color: var(--muted);
+  font-weight: 700;
+}
+.easy-step.now { background: var(--ink); color: #fff; }
+.easy-step.done { background: var(--ok-bg); color: var(--ok); }
 .shared-note { font-weight: 700; margin: 8px 0; }
 .product-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .product-list .btn { min-height: 52px; }

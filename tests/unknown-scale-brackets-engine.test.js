@@ -594,6 +594,16 @@ check("student-facing sources keep the motto and omit unit coefficients", () => 
   assert.ok(blob.indexOf("unknown-scale-brackets/") !== -1);
   assert.ok(blob.indexOf("引導模式") !== -1);
   assert.ok(blob.indexOf("挑戰模式") !== -1);
+  const app = fs.readFileSync(path.join(__dirname, "..", "form1/unknown-scale-brackets/js/app.js"), "utf8");
+  assert.strictEqual(app.indexOf("1／3"), -1);
+  assert.strictEqual(app.indexOf("2／3"), -1);
+  assert.strictEqual(app.indexOf("3／3"), -1);
+  assert.ok(app.indexOf("第 1 步：公式") !== -1);
+  assert.ok(app.indexOf("第 2 步：代入") !== -1);
+  assert.ok(app.indexOf("第 3 步：面積") !== -1);
+  assert.strictEqual(app.indexOf('"<b>長 '), -1);
+  assert.strictEqual(app.indexOf("<small>闊 "), -1);
+  assert.ok(app.indexOf("rect-length") !== -1);
 });
 
 console.log(passed + " passed");
