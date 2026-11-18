@@ -101,20 +101,26 @@
     feedbackFlash += 1;
   }
   function rectHtml(strips, pickable) {
-    var word = strips.length > 2 ? "每條都一樣" : strips.length === 2 ? "兩塊一樣" : "整塊";
+    var total = 0;
+    strips.forEach(function (strip) { total += Number(strip.flex) || 0; });
+    if (!total) total = 13;
     var inner = strips.map(function (strip) {
       var cls = "strip" + (strip.omitted ? " is-omitted" : "") + (pickable && pickedRegion === strip.id ? " is-picked" : "");
       var caption = strip.caption ? "<small>" + esc(strip.caption) + "</small>" : "";
       var flag = strip.omitted ? '<span class="omit-flag">未計入</span>' : "";
       var label = "長 " + strip.length + "，闊 " + strip.width + (strip.omitted ? "，未計入" : "");
       var body = "<b>長 " + esc(strip.length) + "</b><small>闊 " + esc(strip.width) + "</small>" + caption + flag;
+      var style = "flex:" + Number(strip.flex) + " 1 0";
       if (pickable) {
-        return '<button type="button" class="' + cls + '" style="flex:' + Number(strip.flex) + '" data-act="pick-region" data-region="' +
+        return '<button type="button" class="' + cls + '" style="' + style + '" data-act="pick-region" data-region="' +
           esc(strip.id) + '" aria-pressed="' + (pickedRegion === strip.id ? "true" : "false") + '" aria-label="' + esc(label) + '">' + body + "</button>";
       }
-      return '<div class="' + cls + '" style="flex:' + Number(strip.flex) + '" role="img" aria-label="' + esc(label) + '">' + body + "</div>";
+      return '<div class="' + cls + '" style="' + style + '" role="img" aria-label="' + esc(label) + '">' + body + "</div>";
     }).join("");
-    return '<div class="rect-wrap"><div class="width-flag">闊度 4，' + word + '</div><div class="strips">' + inner + "</div></div>";
+    return '<figure class="rect-figure" style="--len:' + total + '">' +
+      '<div class="rect-stage">' +
+      '<div class="rect-width" aria-hidden="true"><b>闊 4</b></div>' +
+      '<div class="rect-body">' + inner + "</div></div></figure>";
   }
   function workshopPills(phase) {
     var index = { area: 0, stw: 1, parts: 2, match: 3, three: 4, done: 4 }[phase] || 0;

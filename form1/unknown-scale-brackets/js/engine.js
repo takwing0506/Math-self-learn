@@ -615,14 +615,15 @@
 
   function threeStrips(w) {
     var hi = w.highlight;
+    /* 圖上的 x 只畫成一段正長度，用來看出闊度 4。不是某個特定數值。 */
     if (w.combined) {
       return [
-        { id: "x", flex: 2, length: "x", width: "4", omitted: hi.indexOf("x") !== -1, caption: w.distributed ? "4×x" : "" },
-        { id: "5", flex: 1, length: "5", width: "4", omitted: hi.indexOf("2") !== -1 || hi.indexOf("3") !== -1, caption: w.distributed ? "4×5" : "" },
+        { id: "x", flex: 8, length: "x", width: "4", omitted: hi.indexOf("x") !== -1, caption: w.distributed ? "4×x" : "" },
+        { id: "5", flex: 5, length: "5", width: "4", omitted: hi.indexOf("2") !== -1 || hi.indexOf("3") !== -1, caption: w.distributed ? "4×5" : "" },
       ];
     }
     return [
-      { id: "x", flex: 3, length: "x", width: "4", omitted: hi.indexOf("x") !== -1, caption: w.distributed ? "4×x" : "" },
+      { id: "x", flex: 8, length: "x", width: "4", omitted: hi.indexOf("x") !== -1, caption: w.distributed ? "4×x" : "" },
       { id: "2", flex: 2, length: "2", width: "4", omitted: hi.indexOf("2") !== -1, caption: w.distributed ? "4×2" : "" },
       { id: "3", flex: 3, length: "3", width: "4", omitted: hi.indexOf("3") !== -1, caption: w.distributed ? "4×3" : "" },
     ];
@@ -636,8 +637,8 @@
   function matchStrips(w) {
     var hi = w.highlight;
     return [
-      { id: "x", flex: 2, length: "x", width: "4", omitted: hi.indexOf("x") !== -1, caption: w.matched.x ? "已配" : "" },
-      { id: "c", flex: 1, length: "3", width: "4", omitted: hi.indexOf("c") !== -1, caption: w.matched.c ? "已配" : "" },
+      { id: "x", flex: 8, length: "x", width: "4", omitted: hi.indexOf("x") !== -1, caption: w.matched.x ? "已配" : "" },
+      { id: "c", flex: 3, length: "3", width: "4", omitted: hi.indexOf("c") !== -1, caption: w.matched.c ? "已配" : "" },
     ];
   }
 
