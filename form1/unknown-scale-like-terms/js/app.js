@@ -86,6 +86,7 @@
       '<div class="back-bar"><div class="bar-links">' +
       '<a class="back-link" href="../">課題目錄</a>' +
       '<a class="back-link" href="../unknown-scale/">第一章</a>' +
+      '<a class="back-link" href="../unknown-scale-brackets/">第三章</a>' +
       "</div></div>" +
       '<header class="top"><div class="wrap">' +
       '<p class="kicker">中一數學 · 一元一次方程</p>' +
