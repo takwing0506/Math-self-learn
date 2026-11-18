@@ -487,6 +487,8 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 }
 .rect-figure {
   --u: 30;
+  --len: 13;
+  --wide: 4;
   margin: 8px 0 16px;
   max-width: 100%;
   overflow-x: auto;
@@ -530,7 +532,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
   display: flex;
   flex: none;
   width: calc(var(--len) * var(--u) * 1px);
-  height: calc(4 * var(--u) * 1px);
+  height: calc(var(--wide) * var(--u) * 1px);
   box-sizing: border-box;
   border: 3px solid var(--ink);
   border-radius: 0;

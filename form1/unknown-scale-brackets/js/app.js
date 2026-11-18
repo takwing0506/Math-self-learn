@@ -17,7 +17,7 @@
   var checkView = null;
   var focusCheck = false;
   var reflect = { expand: null, both: null };
-  var drafts = { area: "", parts: "", three: "" };
+  var drafts = { formula: "", numbers: "", easyArea: "", parts: "", ownA: "", ownB: "", ownAreas: "", three: "" };
   var wrongKey = "";
   var wrongChoices = [];
   var feedbackFlash = 0;
@@ -102,6 +102,7 @@
   }
   function rectHtml(strips, pickable) {
     var total = 0;
+    var wide = strips[0] ? strips[0].width : "4";
     strips.forEach(function (strip) { total += Number(strip.flex) || 0; });
     if (!total) total = 13;
     var inner = strips.map(function (strip) {
@@ -117,14 +118,14 @@
       }
       return '<div class="' + cls + '" style="' + style + '" role="img" aria-label="' + esc(label) + '">' + body + "</div>";
     }).join("");
-    return '<figure class="rect-figure" style="--len:' + total + '">' +
+    return '<figure class="rect-figure" style="--len:' + total + ";--wide:" + esc(wide) + '">' +
       '<div class="rect-stage">' +
-      '<div class="rect-width" aria-hidden="true"><b>闊 4</b></div>' +
+      '<div class="rect-width" aria-hidden="true"><b>闊 ' + esc(wide) + "</b></div>" +
       '<div class="rect-body">' + inner + "</div></div></figure>";
   }
   function workshopPills(phase) {
-    var index = { area: 0, stw: 1, parts: 2, match: 3, three: 4, done: 4 }[phase] || 0;
-    return pills(["面積", "觀察", "兩塊", "字母", "三條"], index);
+    var index = { easy: 0, hard: 1, own: 2, match: 3, three: 4, done: 4 }[phase] || 0;
+    return pills(["公式", "分拆", "自選", "字母", "三條"], index);
   }
   function saveWorkshop(result) {
     writeStore();
@@ -144,7 +145,7 @@
       mottoHtml() +
       '<p class="master">這一章先看長方形的面積，再把括號放上天平。拆括號只改寫一邊；加減和乘除都要兩邊一起做。</p>' +
       "<ul class=\"rules\">" +
-      "<li>先求整塊面積。13 可以直接乘。分成 10 和 3 是另一種算法。</li>" +
+      "<li>先用一位數的長和闊寫出面積公式，再代入，再寫面積。之後才處理較長的長度。</li>" +
       "<li>每一塊都要乘闊度。漏掉的一塊會標出來，不會直接顯示答案。</li>" +
       "<li>方程裡，拆括號只改寫有括號的一邊。移項是兩邊同加或同減。除數是兩邊同乘或同除。</li>" +
       "<li>化成一邊只剩 x 之後，先分類步驟，再把 x 代入原式。</li>" +
@@ -160,31 +161,71 @@
   function renderWorkshop() {
     var view = Engine.workshopView(workshop);
     var body = "";
-    if (view.phase === "area") {
+    if (view.phase === "easy") {
       body = rectHtml(view.strips, false) +
-        (view.split ? '<p class="shared-note">已分成 10 和 3。兩塊的闊度仍是 4。</p>' : "") +
-        (view.areaOk ? "" : (
-          "<h2>這個長方形的面積是多少？</h2>" +
-          '<p class="lead">長 13，闊 4。13 可以直接乘。請寫面積，不要只寫算式。</p>' +
-          '<form data-check-form="area">' +
-          '<label class="field inline">面積 <input id="area-entry" name="area" type="text" inputmode="numeric" autocomplete="off" value="' + esc(drafts.area) + '" aria-label="面積"></label>' +
-          '<div class="btn-row"><button type="submit" class="btn btn-primary">提交面積</button></div></form>'
+        '<p class="q-no">1／3 公式 · 2／3 代入 · 3／3 面積</p>' +
+        "<h2>這一個長方形的面積怎樣求？</h2>" +
+        '<p class="lead">長和闊都是一位數。先寫公式，再代入數字，最後才寫面積。做完這三步才到下一題。</p>' +
+        (view.easyStep > 0 ? '<p class="shared-note">面積 = 長 × 闊</p>' : "") +
+        (view.easyStep > 1 ? '<p class="shared-note">7 × 4</p>' : "") +
+        (view.easyStep === 0 ? (
+          '<form data-check-form="formula">' +
+          '<label class="field">面積公式<input id="formula-entry" type="text" autocomplete="off" value="' + esc(drafts.formula) + '" aria-label="面積公式"></label>' +
+          '<div class="btn-row"><button type="submit" class="btn btn-primary">寫下公式</button></div></form>'
+        ) : "") +
+        (view.easyStep === 1 ? (
+          '<form data-check-form="numbers">' +
+          '<label class="field">把長和闊代進去<input id="numbers-entry" type="text" autocomplete="off" value="' + esc(drafts.numbers) + '" aria-label="代入長和闊"></label>' +
+          '<div class="btn-row"><button type="submit" class="btn btn-primary">代入</button></div></form>'
+        ) : "") +
+        (view.easyStep === 2 ? (
+          '<form data-check-form="easy-area">' +
+          '<label class="field">面積<input id="easy-area" type="text" inputmode="numeric" autocomplete="off" value="' + esc(drafts.easyArea) + '" aria-label="面積"></label>' +
+          '<div class="btn-row"><button type="submit" class="btn btn-primary">寫下面積</button></div></form>'
+        ) : "");
+    } else if (view.phase === "hard") {
+      body = rectHtml(view.strips, false) +
+        (view.hardStage === "think" ? (
+          "<h2>這個面積可以怎樣算得容易些？</h2>" +
+          '<p class="lead">長度已是兩位數。先不要拆開圖，想一想方法。</p>' +
+          '<p class="master">' + esc(view.think.ask) + "</p>" +
+          choiceButtons(view.think.choices, "pick-think", "think")
+        ) : "") +
+        (view.canSplit ? (
+          '<p class="shared-note">可以把十位和個位分成兩塊，闊度仍然一樣。</p>' +
+          '<div class="btn-row"><button type="button" class="btn btn-primary" data-act="split">把 17 分成 10 和 7</button></div>'
+        ) : "") +
+        (view.stw ? (
+          '<p class="shared-note">闊度 6 仍在兩塊上。</p>' +
+          '<p class="q-no">' + esc(view.stw.label) + " " + view.stw.index + "／" + view.stw.total + "</p>" +
+          '<p class="master">' + esc(view.stw.ask) + "</p>" +
+          choiceButtons(view.stw.choices, "pick-stw", "stw-" + view.stwIndex)
+        ) : "") +
+        (view.hardStage === "expr" ? (
+          "<h2>寫出兩塊面積相加的式</h2>" +
+          '<p class="lead">兩塊都要乘闊度。如果少了一塊，那一塊會標成未計入。</p>' +
+          '<form data-check-form="parts">' +
+          '<label class="field">兩塊面積相加<input id="parts-entry" type="text" autocomplete="off" value="' + esc(drafts.parts) + '" aria-label="兩塊面積相加的式"></label>' +
+          '<div class="btn-row"><button type="submit" class="btn btn-primary">檢查</button></div></form>'
+        ) : "");
+    } else if (view.phase === "own") {
+      body = rectHtml(view.strips, false) +
+        (view.comparison ? '<p class="shared-note">' + esc(view.comparison) + "</p>" : "") +
+        (view.own.split ? "" : (
+          "<h2>這次由你決定怎樣分</h2>" +
+          '<p class="lead">長度是 16，闊度是 5。兩段都要是正整數，加起來等於 16。不要限於十位和個位。</p>' +
+          '<form data-check-form="own-split">' +
+          '<label class="field">第一段長度<input id="own-a" type="text" inputmode="numeric" autocomplete="off" value="' + esc(drafts.ownA) + '" aria-label="第一段長度"></label>' +
+          '<label class="field">第二段長度<input id="own-b" type="text" inputmode="numeric" autocomplete="off" value="' + esc(drafts.ownB) + '" aria-label="第二段長度"></label>' +
+          '<div class="btn-row"><button type="submit" class="btn btn-primary">分成這兩段</button></div></form>'
         )) +
-        (view.split ? "" : '<div class="btn-row"><button type="button" class="btn btn-primary" data-act="split">把長度分成 10 和 3</button></div>') +
-        '<p class="fine">按鈕會把長度分成 10 和 3。這不是因為 13 難算。</p>';
-    } else if (view.phase === "stw") {
-      body = rectHtml(view.strips, false) +
-        '<p class="shared-note">闊度 4 仍在兩塊上。</p>' +
-        '<p class="q-no">' + esc(view.stw.label) + " " + view.stw.index + "／" + view.stw.total + "</p>" +
-        '<p class="master">' + esc(view.stw.ask) + "</p>" +
-        choiceButtons(view.stw.choices, "pick-stw", "stw-" + view.stwIndex);
-    } else if (view.phase === "parts") {
-      body = rectHtml(view.strips, false) +
-        "<h2>寫出兩塊面積相加的式</h2>" +
-        '<p class="lead">兩塊都要乘闊度。如果少了一塊，那一塊會標成未計入。</p>' +
-        '<form data-check-form="parts">' +
-        '<label class="field">兩塊面積相加<input id="parts-entry" name="parts" type="text" autocomplete="off" value="' + esc(drafts.parts) + '" aria-label="兩塊面積相加的式"></label>' +
-        '<div class="btn-row"><button type="submit" class="btn btn-primary">檢查</button></div></form>';
+        (view.own.split ? (
+          "<h2>寫出這兩塊的面積和</h2>" +
+          '<p class="lead">已分成 ' + esc(String(view.own.a)) + " 和 " + esc(String(view.own.b)) + "。兩塊都要乘闊度 5。</p>" +
+          '<form data-check-form="own-areas">' +
+          '<label class="field">兩塊面積相加<input id="own-areas" type="text" autocomplete="off" value="' + esc(drafts.ownAreas) + '" aria-label="兩塊面積相加的式"></label>' +
+          '<div class="btn-row"><button type="submit" class="btn btn-primary">檢查</button></div></form>'
+        ) : "");
     } else if (view.phase === "match") {
       body = (view.comparison ? '<p class="shared-note">' + esc(view.comparison) + "</p>" : "") +
         rectHtml(view.strips, true) +
@@ -454,11 +495,13 @@
   }
 
   function render() {
-    var draftNode = document.getElementById("area-entry") || document.getElementById("parts-entry") || document.getElementById("three-entry") || document.getElementById("x-entry");
-    if (draftNode && draftNode.id === "area-entry") drafts.area = draftNode.value;
-    if (draftNode && draftNode.id === "parts-entry") drafts.parts = draftNode.value;
-    if (draftNode && draftNode.id === "three-entry") drafts.three = draftNode.value;
-    if (draftNode && draftNode.id === "x-entry") checkDraft = draftNode.value;
+    ["formula", "numbers", "easyArea", "parts", "ownA", "ownB", "ownAreas", "three"].forEach(function (key) {
+      var id = key === "easyArea" ? "easy-area" : key === "ownA" ? "own-a" : key === "ownB" ? "own-b" : key === "ownAreas" ? "own-areas" : key === "formula" ? "formula-entry" : key === "numbers" ? "numbers-entry" : key === "parts" ? "parts-entry" : "three-entry";
+      var node = document.getElementById(id);
+      if (node) drafts[key] = node.value;
+    });
+    var checkNode = document.getElementById("x-entry");
+    if (checkNode) checkDraft = checkNode.value;
     var body = renderIntro();
     if (screen === "workshop") body = renderWorkshop();
     if (screen === "hub") body = renderHub();
@@ -520,7 +563,7 @@
       }
       screen = "workshop";
       pickedRegion = "";
-      feedback = { kind: "info", text: "先寫整塊面積。也可以先把長度分成 10 和 3。" };
+      feedback = { kind: "info", text: "先寫面積公式。長和闊都是一位數。" };
       render();
       return;
     }
@@ -536,6 +579,15 @@
       return;
     }
     if (act === "split") { saveWorkshop(Engine.splitLength(workshop)); render(); return; }
+    if (act === "pick-think") {
+      var thought = Engine.answerHardThink(workshop, actEl.dataset.choice);
+      if (!thought.ok) markWrong("think", actEl.dataset.choice);
+      else wrongChoices = [];
+      saveWorkshop(thought);
+      if (!thought.ok) feedback.kind = "bad";
+      render();
+      return;
+    }
     if (act === "undo-workshop") { saveWorkshop(Engine.undoWorkshop(workshop)); render(); return; }
     if (act === "pick-stw") {
       var graded = Engine.gradeStw(workshop, actEl.dataset.choice);
@@ -702,9 +754,37 @@
     if (!form) return;
     event.preventDefault();
     var kind = form.getAttribute("data-check-form");
-    if (kind === "area") {
-      drafts.area = document.getElementById("area-entry").value;
-      saveWorkshop(Engine.submitArea(workshop, drafts.area));
+    if (kind === "formula") {
+      drafts.formula = document.getElementById("formula-entry").value;
+      saveWorkshop(Engine.submitFormula(workshop, drafts.formula));
+      if (!workshop.easyStep) feedback.kind = feedback.text.indexOf("扣") !== -1 ? "bad" : "info";
+      render();
+      return;
+    }
+    if (kind === "numbers") {
+      drafts.numbers = document.getElementById("numbers-entry").value;
+      saveWorkshop(Engine.submitNumbers(workshop, drafts.numbers));
+      render();
+      return;
+    }
+    if (kind === "easy-area") {
+      drafts.easyArea = document.getElementById("easy-area").value;
+      saveWorkshop(Engine.submitEasyArea(workshop, drafts.easyArea));
+      render();
+      return;
+    }
+    if (kind === "own-split") {
+      drafts.ownA = document.getElementById("own-a").value;
+      drafts.ownB = document.getElementById("own-b").value;
+      saveWorkshop(Engine.submitOwnSplit(workshop, drafts.ownA, drafts.ownB));
+      render();
+      return;
+    }
+    if (kind === "own-areas") {
+      drafts.ownAreas = document.getElementById("own-areas").value;
+      var own = Engine.submitOwnAreas(workshop, drafts.ownAreas);
+      saveWorkshop(own);
+      if (!own.ok) feedback.kind = own.message.indexOf("扣") !== -1 ? "bad" : "info";
       render();
       return;
     }

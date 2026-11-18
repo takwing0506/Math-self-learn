@@ -103,19 +103,41 @@
     },
   ];
 
+  var EASY = { length: 7, width: 4, area: 28 };
+  var HARD = { length: 17, width: 6, tens: 10, units: 7, area: 102 };
+  var OWN = { length: 16, width: 5, area: 80 };
+
+  var HARD_THINK = {
+    ask: "17 乘 6 不容易一次心算。可以怎樣算得容易些？",
+    choices: [
+      "把 17 分成十位和個位，畫成兩塊長方形，再把兩塊面積加起來。",
+      "把闊度改成 1，就不用乘。",
+      "只算十位那一塊，個位照抄長度。",
+      "把長和闊相加。",
+    ],
+    answer: 0,
+    right: "對。先分成十位和個位兩塊，兩塊都乘同一個闊度，再相加。",
+    wrongs: [
+      "",
+      "改闊度會變成另一個長方形。",
+      "個位那一塊若只照抄長度，面積就漏了。",
+      "面積不是長加闊。",
+    ],
+  };
+
   var STW = [
     {
       ask: "兩塊有甚麼是共用的？",
       choices: [
-        "兩塊的長度都是 13。",
-        "兩塊共用闊度 4。",
+        "兩塊的長度都是 17。",
+        "兩塊共用闊度 6。",
         "分割之後就不必再乘。",
         "共用的是已經算出的面積。",
       ],
       answer: 1,
-      right: "對。分割之後，闊度 4 仍在兩塊上。",
+      right: "對。分割之後，闊度 6 仍在兩塊上。",
       wrongs: [
-        "再看兩塊的長度：一塊是 10，一塊是 3。",
+        "再看兩塊的長度：一塊是十位，一塊是個位。",
         "",
         "分割只是把長度分開，闊度還在。",
         "面積還未寫成兩塊相加。先看兩塊相同的是甚麼。",
@@ -124,35 +146,35 @@
     {
       ask: "每一小塊面積怎樣計？",
       choices: [
-        "把 10 和 3 相加就是面積。",
-        "只計算第一塊。",
+        "把十位和個位相加就是面積。",
+        "只計算十位那一塊。",
         "每一塊都用自己的長度乘共用的闊度。",
-        "因為 13 比較難，所以要改用別的數。",
+        "因為 17 是兩位數，所以不用再乘。",
       ],
       answer: 2,
       right: "對。每塊面積都是長度乘闊度。",
       wrongs: [
-        "10 加 3 是長度，不是面積。",
+        "十位加個位是長度，不是面積。",
         "兩塊都要計算。",
         "",
-        "13 可以直接乘。拆開只是另一種算法，不是因為它難。",
+        "兩位數只是比較長。拆開之後，每一塊仍要乘闊度。",
       ],
     },
     {
-      ask: "為甚麼每一項都要乘 4？",
+      ask: "為甚麼每一項都要乘 6？",
       choices: [
-        "因為 13 很難直接計算。",
-        "因為只要第一段乘 4，另一段照抄長度。",
-        "因為兩塊都用同一個闊度 4，所以每一段長度都要乘 4。",
-        "因為 4 會是後面方程的解。",
+        "因為 17 很難直接計算。",
+        "因為只要十位乘 6，個位照抄長度。",
+        "因為兩塊都用同一個闊度 6，所以每一段長度都要乘 6。",
+        "因為 6 會是後面方程的解。",
       ],
       answer: 2,
-      right: "對。闊度是共用的，所以每一段都要乘 4。",
+      right: "對。闊度是共用的，所以每一段都要乘 6。",
       wrongs: [
-        "13 可以直接乘。這裡乘 4，是因為闊度是 4。",
-        "另一段若只照抄長度，那一塊的面積就漏了。",
+        "這裡乘 6，是因為闊度是 6。",
+        "個位若只照抄長度，那一塊的面積就漏了。",
         "",
-        "4 是這個長方形的闊度，不是某一題方程的解。",
+        "6 是這個長方形的闊度，不是某一題方程的解。",
       ],
     },
   ];
@@ -363,13 +385,14 @@
     "(4)(x+3+2)": true,
   };
 
-  function joinNames(ids) {
+  function joinNames(ids, labels) {
     var names = ids.map(function (id) {
+      if (labels && labels[id]) return labels[id];
       if (id === "x") return "長度 x";
       if (id === "10") return "長度 10";
       if (id === "3") return "長度 3";
       if (id === "2") return "長度 2";
-      return id;
+      return "長度 " + id;
     });
     if (names.length === 1) return names[0];
     if (names.length === 2) return names[0] + " 和 " + names[1];
@@ -377,65 +400,94 @@
   }
 
   function gradeAreas(raw) {
-    var parts = piecesOf(raw);
-    var results;
+    return gradePartition(raw, {
+      width: HARD.width,
+      total: HARD.length,
+      area: HARD.area,
+      parts: [
+        { id: String(HARD.tens), length: HARD.tens },
+        { id: String(HARD.units), length: HARD.units },
+      ],
+    });
+  }
+
+  function gradePartition(raw, spec) {
+    var pieces = piecesOf(raw);
+    var results = [];
     var i;
     var best;
     if (!String(raw == null ? "" : raw).trim()) {
       return { ok: false, penalize: false, highlight: [], message: "請寫出兩塊面積相加。" };
     }
-    results = [];
-    for (i = 0; i < parts.length; i += 1) results.push(gradeAreasPiece(parts[i]));
+    for (i = 0; i < pieces.length; i += 1) results.push(gradePartitionPiece(pieces[i], spec));
     for (i = 0; i < results.length; i += 1) if (results[i].ok) return results[i];
     best = results[0];
     for (i = 0; i < results.length; i += 1) if (results[i].penalize) best = results[i];
     return best || { ok: false, penalize: false, highlight: [], message: "這個式還看不懂。兩塊用加號連起來。" };
   }
 
-  function gradeAreasPiece(raw) {
+  function gradePartitionPiece(raw, spec) {
     var found = analyzeTerms(raw);
-    var terms;
-    var poly;
-    var cover = { "10": false, "3": false };
+    var labels = {};
+    var need = {};
+    var products = [];
     var wrong = [];
     var missing = [];
     var i;
+    var j;
     var t;
+    var taken;
     if (!found) return { ok: false, penalize: false, highlight: [], message: "這個式還看不懂。請用乘號和加號把兩塊連起來。" };
-    terms = found.terms;
-    poly = found.poly;
-    if (poly.a !== 0) return { ok: false, penalize: false, highlight: [], message: "這裡的長度是 10 和 3，還沒有 x。" };
-    for (i = 0; i < terms.length; i += 1) {
-      t = terms[i].b;
-      if (t === 40) cover["10"] = true;
-      else if (t === -40) wrong.push("10");
-      else if (t === 12) cover["3"] = true;
-      else if (t === -12) wrong.push("3");
+    if (found.poly.a !== 0) return { ok: false, penalize: false, highlight: [], message: "這裡的長度是數字，還沒有 x。" };
+    for (i = 0; i < spec.parts.length; i += 1) {
+      labels[spec.parts[i].id] = "長度 " + spec.parts[i].length;
+      need[spec.parts[i].id] = spec.width * spec.parts[i].length;
+      products.push(spec.parts[i].id);
     }
-    if (poly.b === 52 && cover["10"] && cover["3"] && !wrong.length) {
-      return {
-        ok: true,
-        penalize: false,
-        highlight: [],
-        message: "兩塊都乘了闊度。4×13 = 52，4×10 + 4×3 = 52。拆開之後，兩塊面積之和等於整塊。",
-      };
+    for (i = 0; i < found.terms.length; i += 1) {
+      t = found.terms[i].b;
+      if (found.terms[i].a) continue;
+      taken = "";
+      for (j = 0; j < products.length; j += 1) {
+        if (need[products[j]] !== null && t === need[products[j]]) {
+          taken = products[j];
+          need[products[j]] = null;
+          break;
+        }
+      }
+      if (taken) continue;
+      for (j = 0; j < products.length; j += 1) {
+        if (t === -spec.width * spec.parts[j].length) wrong.push(products[j]);
+      }
     }
+    if (found.poly.b === spec.area && !wrong.length) {
+      var open = false;
+      for (i = 0; i < products.length; i += 1) if (need[products[i]] !== null) open = true;
+      if (!open) {
+        return {
+          ok: true,
+          penalize: false,
+          highlight: [],
+          message: partitionSuccess(spec),
+        };
+      }
+    }
+    wrong = unique(wrong).filter(function (id) { return need[id] !== null; });
     if (wrong.length) {
       return {
         ok: false,
         penalize: true,
         highlight: wrong,
-        message: joinNames(wrong) + " 的那一塊不應寫成減。兩塊面積都要加。",
+        message: joinNames(wrong, labels) + " 的那一塊不應寫成減。兩塊面積都要加。",
       };
     }
-    if (!cover["10"]) missing.push("10");
-    if (!cover["3"]) missing.push("3");
-    if (poly.b === 52 && missing.length === 2) {
+    for (i = 0; i < products.length; i += 1) if (need[products[i]] !== null) missing.push(products[i]);
+    if (found.poly.b === spec.area && missing.length === products.length) {
       return {
         ok: false,
         penalize: false,
-        highlight: ["10", "3"],
-        message: "這是整塊面積。請把長度 10 和長度 3 兩塊分開乘闊度，再相加。",
+        highlight: missing.slice(),
+        message: "這是整塊面積。請把兩段長度分開乘闊度，再相加。",
       };
     }
     if (missing.length) {
@@ -443,10 +495,15 @@
         ok: false,
         penalize: true,
         highlight: missing,
-        message: joinNames(missing) + " 的那一塊還沒有乘闊度 4。",
+        message: joinNames(missing, labels) + " 的那一塊還沒有乘闊度 " + spec.width + "。",
       };
     }
     return { ok: false, penalize: true, highlight: [], message: "兩塊的總和還不對。請再看每一塊有沒有乘闊度。" };
+  }
+
+  function partitionSuccess(spec) {
+    var bits = spec.parts.map(function (part) { return spec.width + "×" + part.length; }).join(" + ");
+    return "兩塊都乘了闊度。" + spec.width + "×" + spec.total + " = " + spec.area + "，" + bits + " = " + spec.area + "。";
   }
 
   function gradeThree(raw) {
@@ -558,19 +615,29 @@
     return "扣 10 分，現為 " + obj.score + " 分。";
   }
 
-  function remember(w) {
-    w.history.push({
-      areaOk: w.areaOk,
+  function snapWorkshop(w) {
+    return {
+      easyStep: w.easyStep,
+      easyOk: w.easyOk,
+      thinkOk: w.thinkOk,
       split: w.split,
       stw: w.stw,
-      partsOk: w.partsOk,
+      hardOk: w.hardOk,
+      ownA: w.ownA,
+      ownB: w.ownB,
+      ownSplit: w.ownSplit,
+      ownOk: w.ownOk,
       highlight: w.highlight.slice(),
       matched: { x: w.matched.x, c: w.matched.c },
       threeMode: w.threeMode,
       combined: w.combined,
       distributed: w.distributed,
       threeOk: w.threeOk,
-    });
+    };
+  }
+
+  function remember(w) {
+    w.history.push(snapWorkshop(w));
     if (w.history.length > 40) w.history.shift();
   }
 
@@ -578,10 +645,16 @@
     return {
       score: 100,
       misses: [],
-      areaOk: false,
+      easyStep: 0,
+      easyOk: false,
+      thinkOk: false,
       split: false,
       stw: 0,
-      partsOk: false,
+      hardOk: false,
+      ownA: 0,
+      ownB: 0,
+      ownSplit: false,
+      ownOk: false,
       highlight: [],
       matched: { x: "", c: "" },
       threeMode: "practice",
@@ -593,23 +666,35 @@
   }
 
   function workshopPhase(w) {
-    if (!w.areaOk || !w.split) return "area";
-    if (w.stw < 3) return "stw";
-    if (!w.partsOk) return "parts";
+    if (!w.easyOk) return "easy";
+    if (!w.hardOk) return "hard";
+    if (!w.ownOk) return "own";
     if (!w.matched.x || !w.matched.c) return "match";
     if (!w.threeOk) return "three";
     return "done";
   }
 
-  function areaStrips(w) {
+  function numeralStrips(w) {
     var hi = w.highlight;
-    if (!w.split) {
-      return [{ id: "13", flex: 13, length: "13", width: "4", omitted: false, caption: "" }];
+    var phase = workshopPhase(w);
+    if (phase === "easy") {
+      return [{ id: "7", flex: EASY.length, length: String(EASY.length), width: String(EASY.width), omitted: false, caption: "" }];
     }
-    if (workshopPhase(w) === "three" || w.threeOk) return threeStrips(w);
+    if (phase === "hard") {
+      if (!w.split) {
+        return [{ id: "17", flex: HARD.length, length: String(HARD.length), width: String(HARD.width), omitted: false, caption: "" }];
+      }
+      return [
+        { id: "10", flex: HARD.tens, length: String(HARD.tens), width: String(HARD.width), omitted: hi.indexOf("10") !== -1, caption: "" },
+        { id: "7", flex: HARD.units, length: String(HARD.units), width: String(HARD.width), omitted: hi.indexOf("7") !== -1, caption: "" },
+      ];
+    }
+    if (!w.ownSplit) {
+      return [{ id: "16", flex: OWN.length, length: String(OWN.length), width: String(OWN.width), omitted: false, caption: "" }];
+    }
     return [
-      { id: "10", flex: 10, length: "10", width: "4", omitted: hi.indexOf("10") !== -1, caption: "" },
-      { id: "3", flex: 3, length: "3", width: "4", omitted: hi.indexOf("3") !== -1, caption: "" },
+      { id: "p1", flex: w.ownA, length: String(w.ownA), width: String(OWN.width), omitted: hi.indexOf("p1") !== -1, caption: "" },
+      { id: "p2", flex: w.ownB, length: String(w.ownB), width: String(OWN.width), omitted: hi.indexOf("p2") !== -1, caption: "" },
     ];
   }
 
@@ -646,16 +731,32 @@
     var phase = workshopPhase(w);
     var step = STW[w.stw] || STW[2];
     var both = !!(w.matched.x && w.matched.c);
-    var strips = areaStrips(w);
+    var strips = numeralStrips(w);
+    var hardStage = "think";
     if (phase === "match") strips = matchStrips(w);
     if (phase === "three" || phase === "done") strips = threeStrips(w);
+    if (w.thinkOk && !w.split) hardStage = "offer";
+    if (w.split && w.stw < 3) hardStage = "stw";
+    if (w.split && w.stw >= 3 && !w.hardOk) hardStage = "expr";
+    if (w.hardOk) hardStage = "done";
     return {
       phase: phase,
       score: w.score,
+      easyStep: w.easyStep,
+      easy: { length: EASY.length, width: EASY.width },
+      hard: {
+        length: HARD.length,
+        width: HARD.width,
+        tens: w.thinkOk ? HARD.tens : null,
+        units: w.thinkOk ? HARD.units : null,
+      },
+      own: { length: OWN.length, width: OWN.width, a: w.ownA, b: w.ownB, split: w.ownSplit },
+      hardStage: hardStage,
+      think: phase === "hard" && !w.thinkOk ? { ask: HARD_THINK.ask, choices: HARD_THINK.choices.slice() } : null,
+      canSplit: !!(w.thinkOk && !w.split),
       split: w.split,
-      areaOk: w.areaOk,
       stwIndex: w.stw,
-      stw: phase === "stw" ? {
+      stw: phase === "hard" && w.split && w.stw < 3 ? {
         label: ["觀察", "思考", "追問"][w.stw],
         index: w.stw + 1,
         total: 3,
@@ -663,9 +764,8 @@
         choices: step.choices.slice(),
       } : null,
       strips: strips,
-      shared: "闊度 4",
       highlight: w.highlight.slice(),
-      comparison: w.partsOk ? "4×13 = 52，4×10 + 4×3 = 52。" : "",
+      comparison: w.hardOk ? (HARD.width + "×" + HARD.length + " = " + HARD.area + "，" + HARD.width + "×" + HARD.tens + " + " + HARD.width + "×" + HARD.units + " = " + HARD.area + "。") : "",
       products: phase === "match" ? PRODUCTS.map(function (item) { return { id: item.id, label: item.label }; }) : [],
       matched: { x: w.matched.x, c: w.matched.c },
       bridge: both ? "所以 4(x + 3) = 4x + 12。兩塊都乘了闊度。" : "",
@@ -675,40 +775,115 @@
       distributed: w.distributed,
       threeReveal: w.threeOk ? "4(x + 2 + 3) = 4x + 8 + 12，也可以先寫成 4(x + 5) = 4x + 20。" : "",
       canUndo: w.history.length > 0,
-      formulaReady: !!w.partsOk,
+      formulaReady: !!w.hardOk,
     };
   }
 
-  function submitArea(w, raw) {
+  function formulaText(raw) {
+    return String(raw == null ? "" : raw)
+      .replace(/\s+/g, "")
+      .replace(/＝/g, "=")
+      .replace(/[×＊·]/g, "*")
+      .replace(/乘/g, "*")
+      .replace(/等於/g, "=")
+      .replace(/長方形/g, "")
+      .replace(/的/g, "")
+      .replace(/是/g, "=")
+      .replace(/^面積=/, "")
+      .replace(/^面積/, "");
+  }
+
+  function isAreaFormula(raw) {
+    var s = formulaText(raw);
+    return s === "長*闊" || s === "闊*長";
+  }
+
+  function isSevenByFour(raw) {
+    var found = analyzeTerms(raw);
+    var text = normalizeExpr(raw);
+    if (!found || found.poly.a !== 0 || found.poly.b !== EASY.area) return false;
+    return text.indexOf("7") !== -1 && text.indexOf("4") !== -1 && text !== "28";
+  }
+
+  function submitFormula(w, raw) {
+    var text = String(raw == null ? "" : raw).trim();
+    if (w.easyStep > 0 || w.easyOk) return { ok: true, message: "公式已經寫好。", score: w.score };
+    if (!text) return { ok: false, message: "請寫出面積公式。用長和闊。", score: w.score };
+    if (isAreaFormula(text)) {
+      remember(w);
+      w.easyStep = 1;
+      return { ok: true, message: "對。長方形的面積 = 長 × 闊。下一步把 7 和 4 代進去。", score: w.score };
+    }
+    if (isSevenByFour(text) || parseStudent(text) === EASY.area) {
+      return { ok: false, message: "這是代入或算出的結果。請先寫公式，用長和闊。", score: w.score };
+    }
+    if (formulaText(text).indexOf("+") !== -1 || formulaText(text).indexOf("長闊") !== -1 && formulaText(text).indexOf("*") === -1) {
+      return { ok: false, message: "面積不是把長和闊相加。請改用乘法。" + penalize(w, "公式"), score: w.score };
+    }
+    return { ok: false, message: "請用乘法把長和闊連起來。", score: w.score };
+  }
+
+  function submitNumbers(w, raw) {
+    var text = String(raw == null ? "" : raw).trim();
+    if (w.easyStep < 1) return { ok: false, message: "請先寫面積公式。", score: w.score };
+    if (w.easyStep > 1 || w.easyOk) return { ok: true, message: "數字已經代進去。", score: w.score };
+    if (isSevenByFour(text)) {
+      remember(w);
+      w.easyStep = 2;
+      return { ok: true, message: "對，7 × 4。最後寫出面積的數。", score: w.score };
+    }
+    if (parseStudent(text) === EASY.area) {
+      return { ok: false, message: "這是面積的數。這一格要寫長和闊相乘，還不是最後的數。", score: w.score };
+    }
+    if (normalizeExpr(text) === "7+4" || normalizeExpr(text) === "4+7") {
+      return { ok: false, message: "這裡仍然是乘法，不是相加。" + penalize(w, "公式"), score: w.score };
+    }
+    return { ok: false, message: "把長 7 和闊 4 乘起來。", score: w.score };
+  }
+
+  function submitEasyArea(w, raw) {
     var text = String(raw == null ? "" : raw).trim();
     var n = parseStudent(text);
     var found;
-    if (n === 52) {
+    if (w.easyStep < 2) return { ok: false, message: "請先寫公式，再代入 7 和 4。", score: w.score };
+    if (w.easyOk) return { ok: true, message: "這一題已經完成。", score: w.score };
+    if (n === EASY.area) {
       remember(w);
-      w.areaOk = true;
-      return { ok: true, message: "整塊面積是 52。13 可以直接乘。接下來可以把長度分成 10 和 3，那是另一種算法。", score: w.score };
+      w.easyOk = true;
+      return { ok: true, message: "整塊面積是 28。長和闊都是一位數，可以直接乘。", score: w.score };
+    }
+    if (isSevenByFour(text)) {
+      return { ok: false, message: "7 × 4 是算式。請寫面積的數。", score: w.score };
     }
     found = analyzeTerms(text);
-    if (found && found.poly.a === 0 && found.poly.b === 52) {
-      return { ok: false, penalize: false, message: "這是算式。題目要的是面積，請寫一個數。", score: w.score };
+    if (n === null && !found) return { ok: false, message: "請輸入面積，用整數。", score: w.score };
+    return { ok: false, message: "再看長和闊，面積是兩者相乘。" + penalize(w, "面積"), score: w.score };
+  }
+
+  function answerHardThink(w, choice) {
+    var index = Number(choice);
+    if (!w.easyOk) return { ok: false, message: "請先完成一位數的長方形。" };
+    if (w.thinkOk) return { ok: true, message: "已經想好。可以把長度分成十位和個位。", score: w.score };
+    if (index !== HARD_THINK.answer) {
+      return { ok: false, message: (HARD_THINK.wrongs && HARD_THINK.wrongs[index]) || "還不是。請再看這個選項在說甚麼。" };
     }
-    if (n === null && !found) {
-      return { ok: false, penalize: false, message: "請輸入面積，用整數。", score: w.score };
-    }
-    return { ok: false, penalize: true, message: "再看長和闊，面積是兩者相乘。" + penalize(w, "面積"), score: w.score };
+    remember(w);
+    w.thinkOk = true;
+    return { ok: true, message: HARD_THINK.right, score: w.score };
   }
 
   function splitLength(w) {
-    if (w.split) return { ok: true, message: "已經分成 10 和 3。兩塊的闊度仍是 4。", score: w.score };
+    if (!w.thinkOk) return { ok: false, message: "先想一想：怎樣可以算得容易些？圖還不要拆開。", score: w.score };
+    if (w.split) return { ok: true, message: "已經分成 10 和 7。兩塊的闊度仍是 6。", score: w.score };
     remember(w);
     w.split = true;
-    return { ok: true, message: "長度分成 10 和 3。兩塊仍共用闊度 4。", score: w.score };
+    return { ok: true, message: "長度分成十位 10 和個位 7。兩塊仍共用闊度 6。", score: w.score };
   }
 
   function gradeStw(w, choice) {
     var step = STW[w.stw];
     var index = Number(choice);
-    if (!w.areaOk || !w.split) return { ok: false, message: "請先寫出整塊面積，並把長度分成 10 和 3。" };
+    if (!w.split) return { ok: false, message: "請先把長度分成十位和個位。" };
     if (!step) return { ok: true, message: "三問已完成。", done: true };
     if (index !== step.answer) {
       return { ok: false, message: (step.wrongs && step.wrongs[index]) || "還不是。請再看這個選項在說甚麼。" };
@@ -718,16 +893,11 @@
     return { ok: true, message: step.right, done: w.stw >= 3, score: w.score };
   }
 
-  function submitSplit(w, raw) {
-    var graded;
+  function applyPartition(w, raw, graded, doneFlag) {
     var pen;
-    if (!w.areaOk || !w.split || w.stw < 3) {
-      return { ok: false, message: "請先完成面積、分割和上面三問。", highlight: [], score: w.score };
-    }
-    graded = gradeAreas(raw);
     remember(w);
     if (graded.ok) {
-      w.partsOk = true;
+      w[doneFlag] = true;
       w.highlight = [];
       return { ok: true, message: graded.message, highlight: [], score: w.score };
     }
@@ -739,10 +909,48 @@
     return { ok: false, message: graded.message, highlight: w.highlight.slice(), score: w.score };
   }
 
+  function submitSplit(w, raw) {
+    if (!w.split || w.stw < 3) {
+      return { ok: false, message: "請先完成分割和上面三問。", highlight: [], score: w.score };
+    }
+    return applyPartition(w, raw, gradeAreas(raw), "hardOk");
+  }
+
+  function submitOwnSplit(w, aRaw, bRaw) {
+    var a = parseStudent(aRaw);
+    var b = parseStudent(bRaw);
+    if (!w.hardOk) return { ok: false, message: "請先完成上一個長方形。", score: w.score };
+    if (w.ownSplit) return { ok: true, message: "已經分成 " + w.ownA + " 和 " + w.ownB + "。", score: w.score };
+    if (a === null || b === null) return { ok: false, message: "請填兩個正整數。", score: w.score };
+    if (a <= 0 || b <= 0) return { ok: false, message: "每一段都要是正整數。", score: w.score };
+    if (a + b !== OWN.length) {
+      return { ok: false, message: fmtInt(a) + " 加 " + fmtInt(b) + " 不是 " + OWN.length + "。兩段要加回原來的長度。", score: w.score };
+    }
+    remember(w);
+    w.ownA = a;
+    w.ownB = b;
+    w.ownSplit = true;
+    w.highlight = [];
+    return { ok: true, message: "已分成 " + a + " 和 " + b + "。闊度 " + OWN.width + " 仍在兩塊上。兩塊都要乘這個闊度。", score: w.score };
+  }
+
+  function submitOwnAreas(w, raw) {
+    if (!w.ownSplit) return { ok: false, message: "請先決定兩段長度。", highlight: [], score: w.score };
+    return applyPartition(w, raw, gradePartition(raw, {
+      width: OWN.width,
+      total: OWN.length,
+      area: OWN.area,
+      parts: [
+        { id: "p1", length: w.ownA },
+        { id: "p2", length: w.ownB },
+      ],
+    }), "ownOk");
+  }
+
   function matchRegion(w, region, productId) {
     var graded;
     var bridge;
-    if (!w.partsOk) return { ok: false, message: "請先完成兩塊面積。", score: w.score };
+    if (!w.ownOk) return { ok: false, message: "請先完成前面的面積題。", score: w.score };
     if (region !== "x" && region !== "c") return { ok: false, message: "請先點選一塊。", score: w.score };
     if (w.matched[region]) return { ok: true, message: "這一塊已經配好。", score: w.score, done: !!(w.matched.x && w.matched.c) };
     graded = gradeMatch(region, productId);
@@ -819,10 +1027,16 @@
     prev = w.history.pop();
     score = w.score;
     misses = w.misses;
-    w.areaOk = prev.areaOk;
+    w.easyStep = prev.easyStep;
+    w.easyOk = prev.easyOk;
+    w.thinkOk = prev.thinkOk;
     w.split = prev.split;
     w.stw = prev.stw;
-    w.partsOk = prev.partsOk;
+    w.hardOk = prev.hardOk;
+    w.ownA = prev.ownA;
+    w.ownB = prev.ownB;
+    w.ownSplit = prev.ownSplit;
+    w.ownOk = prev.ownOk;
     w.highlight = prev.highlight.slice();
     w.matched = { x: prev.matched.x, c: prev.matched.c };
     w.threeMode = prev.threeMode;
@@ -835,30 +1049,27 @@
   }
 
   function workshopState(w) {
-    return {
-      score: w.score,
-      misses: w.misses.slice(),
-      areaOk: w.areaOk,
-      split: w.split,
-      stw: w.stw,
-      partsOk: w.partsOk,
-      matched: { x: w.matched.x, c: w.matched.c },
-      threeMode: w.threeMode,
-      combined: w.combined,
-      distributed: w.distributed,
-      threeOk: w.threeOk,
-    };
+    var state = snapWorkshop(w);
+    state.score = w.score;
+    state.misses = w.misses.slice();
+    return state;
   }
 
   function restoreWorkshop(data) {
     var w = createWorkshop();
-    if (!data) return w;
+    if (!data || data.easyStep == null && !data.easyOk && !data.hardOk && !data.ownOk) return w;
     w.score = typeof data.score === "number" ? data.score : 100;
     w.misses = Array.isArray(data.misses) ? data.misses.slice() : [];
-    w.areaOk = !!data.areaOk;
+    w.easyStep = data.easyStep || 0;
+    w.easyOk = !!data.easyOk;
+    w.thinkOk = !!data.thinkOk;
     w.split = !!data.split;
     w.stw = data.stw || 0;
-    w.partsOk = !!data.partsOk;
+    w.hardOk = !!data.hardOk;
+    w.ownA = data.ownA || 0;
+    w.ownB = data.ownB || 0;
+    w.ownSplit = !!data.ownSplit;
+    w.ownOk = !!data.ownOk;
     w.matched = { x: data.matched && data.matched.x || "", c: data.matched && data.matched.c || "" };
     w.threeMode = data.threeMode === "challenge" ? "challenge" : "practice";
     w.combined = !!data.combined;
@@ -1894,10 +2105,19 @@
     workshopView: workshopView,
     workshopState: workshopState,
     restoreWorkshop: restoreWorkshop,
-    submitArea: submitArea,
+    easy: EASY,
+    hard: HARD,
+    own: OWN,
+    submitFormula: submitFormula,
+    submitNumbers: submitNumbers,
+    submitEasyArea: submitEasyArea,
+    answerHardThink: answerHardThink,
     splitLength: splitLength,
     gradeStw: gradeStw,
     submitSplit: submitSplit,
+    submitOwnSplit: submitOwnSplit,
+    submitOwnAreas: submitOwnAreas,
+    gradePartition: gradePartition,
     matchRegion: matchRegion,
     setThreeMode: setThreeMode,
     combineThree: combineThree,

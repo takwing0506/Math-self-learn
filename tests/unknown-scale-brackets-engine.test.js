@@ -140,28 +140,81 @@ check("opening text does not reveal x", () => {
   scan("challenge", CHALLENGE);
 });
 
-check("STW comes after the split and before the expanded formula", () => {
+function finishEasy(w) {
+  assert.strictEqual(E.submitFormula(w, "面積 = 長 × 闊").ok, true);
+  assert.strictEqual(E.submitNumbers(w, "7×4").ok, true);
+  assert.strictEqual(E.submitEasyArea(w, "28").ok, true);
+}
+
+function finishStw(w) {
+  for (let i = 0; i < 3; i += 1) {
+    for (let choice = 0; choice < 4; choice += 1) {
+      const trial = E.restoreWorkshop(E.workshopState(w));
+      if (E.gradeStw(trial, choice).ok) {
+        E.gradeStw(w, choice);
+        break;
+      }
+    }
+  }
+}
+
+check("easy rectangle finishes formula, substitution, then area before the next page", () => {
   const w = E.createWorkshop();
-  E.submitArea(w, "52");
-  assert.strictEqual(E.workshopView(w).phase, "area");
-  assert.strictEqual(E.workshopView(w).stw, null);
+  const first = E.workshopView(w);
+  assert.strictEqual(first.phase, "easy");
+  assert.strictEqual(first.strips.map((strip) => strip.length + "x" + strip.width).join(","), "7x4");
+  assert.strictEqual(first.strips.length, 1);
+  assert.strictEqual(JSON.stringify(first).indexOf("10 和 7"), -1);
+  assert.strictEqual(E.submitNumbers(w, "7×4").ok, false);
+  assert.strictEqual(E.submitEasyArea(w, "28").ok, false);
+  const added = E.submitFormula(w, "長 + 闊");
+  assert.strictEqual(added.ok, false);
+  assert.strictEqual(w.score, 90);
+  assert.strictEqual(added.message.indexOf("長 × 闊"), -1);
+  assert.strictEqual(E.submitFormula(w, "長方形的面積是長乘闊").ok, true);
+  assert.strictEqual(E.submitNumbers(w, "28").ok, false);
+  assert.strictEqual(w.easyStep, 1);
+  assert.strictEqual(E.submitNumbers(w, "4 × 7").ok, true);
+  assert.strictEqual(E.submitEasyArea(w, "7×4").ok, false);
+  assert.strictEqual(w.score, 90);
+  const area = E.submitEasyArea(w, "28");
+  assert.strictEqual(area.ok, true);
+  assert.strictEqual(E.workshopView(w).phase, "hard");
+  assert.strictEqual(E.workshopView(w).strips.length, 1);
+  assert.strictEqual(E.workshopView(w).strips[0].length, "17");
+  assert.strictEqual(E.workshopView(w).canSplit, false);
+});
+
+check("STW comes after the tens split and before the expanded formula", () => {
+  const w = E.createWorkshop();
+  finishEasy(w);
+  const before = E.workshopView(w);
+  assert.strictEqual(before.think.ask, "17 乘 6 不容易一次心算。可以怎樣算得容易些？");
+  assert.strictEqual(before.stw, null);
+  assert.strictEqual(before.strips.length, 1);
+  const hidden = JSON.stringify(before);
+  assert.strictEqual(hidden.indexOf("6×10"), -1);
+  assert.strictEqual(hidden.indexOf("6×7"), -1);
+  assert.strictEqual(hidden.indexOf("10 和 7"), -1);
+  assert.strictEqual(E.splitLength(w).ok, false);
+  assert.strictEqual(E.answerHardThink(w, 2).ok, false);
+  assert.strictEqual(w.score, 100);
+  assert.strictEqual(E.answerHardThink(w, 0).ok, true);
+  assert.strictEqual(E.workshopView(w).canSplit, true);
+  assert.strictEqual(E.workshopView(w).strips.length, 1);
   E.splitLength(w);
   const view = E.workshopView(w);
-  assert.strictEqual(view.phase, "stw");
+  assert.strictEqual(view.phase, "hard");
   assert.strictEqual(view.stw.ask, "兩塊有甚麼是共用的？");
-  assert.strictEqual(view.strips.map((strip) => strip.length).join(","), "10,3");
-  assert.ok(view.strips.every((strip) => strip.width === "4"));
-  const early = JSON.stringify(view);
-  assert.strictEqual(early.indexOf("4×10"), -1);
-  assert.strictEqual(early.indexOf("4×3"), -1);
-  assert.strictEqual(early.indexOf("40"), -1);
+  assert.strictEqual(view.strips.map((strip) => strip.length).join(","), "10,7");
+  assert.ok(view.strips.every((strip) => strip.width === "6"));
   assert.strictEqual(view.comparison, "");
   assert.strictEqual(view.formulaReady, false);
   const asks = [];
   for (let i = 0; i < 3; i += 1) {
     const current = E.workshopView(w);
     asks.push(current.stw.ask);
-    assert.strictEqual(JSON.stringify(current).indexOf("4×10 + 4×3"), -1);
+    assert.strictEqual(JSON.stringify(current).indexOf("6×10 + 6×7"), -1);
     let pick = -1;
     for (let choice = 0; choice < 4; choice += 1) {
       const trial = E.restoreWorkshop(E.workshopState(w));
@@ -172,67 +225,96 @@ check("STW comes after the split and before the expanded formula", () => {
     assert.strictEqual(w.score, 100);
     assert.strictEqual(E.gradeStw(w, pick).ok, true);
   }
-  assert.deepStrictEqual(asks, ["兩塊有甚麼是共用的？", "每一小塊面積怎樣計？", "為甚麼每一項都要乘 4？"]);
-  assert.strictEqual(E.workshopView(w).phase, "parts");
+  assert.deepStrictEqual(asks, ["兩塊有甚麼是共用的？", "每一小塊面積怎樣計？", "為甚麼每一項都要乘 6？"]);
+  assert.strictEqual(E.workshopView(w).hardStage, "expr");
   assert.strictEqual(E.workshopView(w).comparison, "");
 });
 
 check("missing the second product highlights that region and does not reveal it", () => {
   const w = E.createWorkshop();
-  E.submitArea(w, "4×13");
-  assert.strictEqual(w.areaOk, false);
-  assert.strictEqual(w.score, 100);
-  assert.ok(E.submitArea(w, "4×13").message.indexOf("面積") !== -1);
-  const wrongNumber = E.submitArea(w, "50");
-  assert.strictEqual(wrongNumber.ok, false);
-  assert.strictEqual(w.score, 90);
-  assert.strictEqual(wrongNumber.message.indexOf("52"), -1);
-  E.submitArea(w, "52");
+  finishEasy(w);
+  const wrongNumber = E.submitEasyArea(E.createWorkshop(), "20");
+  assert.strictEqual(E.createWorkshop().score, 100);
+  E.submitFormula(w, "長×闊");
+  const fresh = E.createWorkshop();
+  E.submitFormula(fresh, "長×闊");
+  E.submitNumbers(fresh, "7×4");
+  const badArea = E.submitEasyArea(fresh, "20");
+  assert.strictEqual(badArea.ok, false);
+  assert.strictEqual(fresh.score, 90);
+  assert.strictEqual(badArea.message.indexOf("28"), -1);
+  E.answerHardThink(w, 0);
   E.splitLength(w);
-  for (let i = 0; i < 3; i += 1) {
-    for (let choice = 0; choice < 4; choice += 1) {
-      const trial = E.restoreWorkshop(E.workshopState(w));
-      if (E.gradeStw(trial, choice).ok) {
-        E.gradeStw(w, choice);
-        break;
-      }
-    }
-  }
-  const missed = E.submitSplit(w, "4×10+3");
+  finishStw(w);
+  const missed = E.submitSplit(w, "6×10+7");
   assert.strictEqual(missed.ok, false);
-  assert.deepStrictEqual(missed.highlight, ["3"]);
-  assert.strictEqual(missed.message.indexOf("12"), -1);
-  assert.strictEqual(missed.message.indexOf("4×3"), -1);
-  assert.strictEqual(missed.message.indexOf("40"), -1);
-  assert.ok(missed.message.indexOf("長度 3") !== -1);
-  assert.strictEqual(w.score, 80);
-  assert.strictEqual(E.workshopView(w).strips.find((strip) => strip.length === "3").omitted, true);
-  const signed = E.submitSplit(w, "4×10−4×3");
+  assert.deepStrictEqual(missed.highlight, ["7"]);
+  assert.strictEqual(missed.message.indexOf("42"), -1);
+  assert.strictEqual(missed.message.indexOf("6×7"), -1);
+  assert.strictEqual(missed.message.indexOf("60"), -1);
+  assert.ok(missed.message.indexOf("長度 7") !== -1);
+  assert.strictEqual(w.score, 90);
+  assert.strictEqual(E.workshopView(w).strips.find((strip) => strip.length === "7").omitted, true);
+  const signed = E.submitSplit(w, "6×10−6×7");
   assert.strictEqual(signed.ok, false);
-  assert.deepStrictEqual(signed.highlight, ["3"]);
+  assert.deepStrictEqual(signed.highlight, ["7"]);
   assert.ok(signed.message.indexOf("減") !== -1);
-  assert.strictEqual(signed.message.indexOf("12"), -1);
-  const bare = E.gradeAreas("4×10");
-  assert.deepStrictEqual(bare.highlight, ["3"]);
-  const other = E.gradeAreas("10+4×3");
+  assert.strictEqual(signed.message.indexOf("42"), -1);
+  const bare = E.gradeAreas("6×10");
+  assert.deepStrictEqual(bare.highlight, ["7"]);
+  const other = E.gradeAreas("10+6×7");
   assert.deepStrictEqual(other.highlight, ["10"]);
-  const fixed = E.submitSplit(w, "4×10+4×3");
+  const fixed = E.submitSplit(w, "6×10+6×7");
   assert.strictEqual(fixed.ok, true);
-  assert.ok(fixed.message.indexOf("4×13 = 52") !== -1);
-  assert.ok(fixed.message.indexOf("4×10 + 4×3 = 52") !== -1);
-  assert.strictEqual(E.gradeAreas("40+12").ok, true);
-  assert.strictEqual(E.gradeAreas("4×3+4×10").ok, true);
+  assert.ok(fixed.message.indexOf("6×17 = 102") !== -1);
+  assert.ok(fixed.message.indexOf("6×10 + 6×7 = 102") !== -1);
+  assert.strictEqual(E.gradeAreas("60+42").ok, true);
   E.undoWorkshop(w);
-  assert.strictEqual(w.partsOk, false);
-  assert.strictEqual(w.score, 70);
+  assert.strictEqual(w.hardOk, false);
+  assert.strictEqual(w.score, 80);
+});
+
+check("the third area task accepts any split that adds back to the length", () => {
+  const w = E.createWorkshop();
+  finishEasy(w);
+  E.answerHardThink(w, 0);
+  E.splitLength(w);
+  finishStw(w);
+  E.submitSplit(w, "6×10+6×7");
+  assert.strictEqual(E.workshopView(w).phase, "own");
+  assert.strictEqual(E.workshopView(w).strips.length, 1);
+  assert.strictEqual(E.workshopView(w).strips[0].length, "16");
+  assert.strictEqual(E.submitOwnSplit(w, "10", "7").ok, false);
+  assert.ok(E.submitOwnSplit(w, "10", "7").message.indexOf("不是 16") !== -1);
+  assert.strictEqual(E.submitOwnSplit(w, "0", "16").ok, false);
+  assert.strictEqual(w.score, 100);
+  assert.strictEqual(E.submitOwnSplit(w, "9", "7").ok, true);
+  assert.strictEqual(E.workshopView(w).strips.map((strip) => strip.length).join(","), "9,7");
+  const missed = E.submitOwnAreas(w, "5×9+7");
+  assert.strictEqual(missed.ok, false);
+  assert.deepStrictEqual(missed.highlight, ["p2"]);
+  assert.strictEqual(missed.message.indexOf("35"), -1);
+  assert.strictEqual(missed.message.indexOf("5×7"), -1);
+  assert.strictEqual(E.workshopView(w).strips.find((strip) => strip.id === "p2").omitted, true);
+  const other = E.createWorkshop();
+  other.hardOk = true;
+  other.easyOk = true;
+  assert.strictEqual(E.submitOwnSplit(other, "8", "8").ok, true);
+  assert.strictEqual(E.submitOwnAreas(other, "5×8+5×8").ok, true);
+  assert.strictEqual(E.submitOwnAreas(w, "5×9+5×7").ok, true);
+  assert.strictEqual(E.workshopView(w).phase, "match");
+  const again = E.createWorkshop();
+  again.easyOk = true;
+  again.hardOk = true;
+  E.submitOwnSplit(again, "10", "6");
+  assert.strictEqual(E.submitOwnAreas(again, "5×10+5×6").ok, true);
 });
 
 check("algebra match and three-strip omission keep the repair visual", () => {
   const w = E.createWorkshop();
-  w.areaOk = true;
-  w.split = true;
-  w.stw = 3;
-  w.partsOk = true;
+  w.easyOk = true;
+  w.hardOk = true;
+  w.ownOk = true;
   const view = E.workshopView(w);
   assert.strictEqual(view.phase, "match");
   assert.strictEqual(view.bridge, "");
@@ -253,10 +335,9 @@ check("algebra match and three-strip omission keep the repair visual", () => {
   assert.ok(E.workshopView(w).bridge.indexOf("4(x + 3) = 4x + 12") !== -1);
 
   const fresh = E.createWorkshop();
-  fresh.areaOk = true;
-  fresh.split = true;
-  fresh.stw = 3;
-  fresh.partsOk = true;
+  fresh.easyOk = true;
+  fresh.hardOk = true;
+  fresh.ownOk = true;
   fresh.matched = { x: "4x", c: "twelve" };
   E.setThreeMode(fresh, "challenge");
   const prompt = E.workshopView(fresh).threePrompt;
