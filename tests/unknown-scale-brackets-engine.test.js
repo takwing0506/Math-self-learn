@@ -179,10 +179,13 @@ check("easy rectangle finishes formula, substitution, then area before the next 
   assert.strictEqual(w.score, 90);
   const area = E.submitEasyArea(w, "28");
   assert.strictEqual(area.ok, true);
-  assert.strictEqual(E.workshopView(w).phase, "hard");
-  assert.strictEqual(E.workshopView(w).strips.length, 1);
-  assert.strictEqual(E.workshopView(w).strips[0].length, "17");
-  assert.strictEqual(E.workshopView(w).canSplit, false);
+  const next = E.workshopView(w);
+  assert.strictEqual(next.phase, "hard");
+  assert.strictEqual(next.strips.length, 1);
+  assert.strictEqual(next.strips[0].length, "17");
+  assert.strictEqual(next.canSplit, false);
+  assert.strictEqual(JSON.stringify(next).indexOf("整塊面積是 28"), -1);
+  assert.strictEqual(JSON.stringify(next).indexOf("可以直接乘"), -1);
 });
 
 check("STW comes after the tens split and before the expanded formula", () => {
@@ -281,9 +284,13 @@ check("the third area task accepts any split that adds back to the length", () =
   E.splitLength(w);
   finishStw(w);
   E.submitSplit(w, "6×10+6×7");
+  const ownView = JSON.stringify(E.workshopView(w));
   assert.strictEqual(E.workshopView(w).phase, "own");
   assert.strictEqual(E.workshopView(w).strips.length, 1);
   assert.strictEqual(E.workshopView(w).strips[0].length, "16");
+  assert.strictEqual(ownView.indexOf("6×17"), -1);
+  assert.strictEqual(ownView.indexOf("102"), -1);
+  assert.strictEqual(ownView.indexOf("6×10"), -1);
   assert.strictEqual(E.submitOwnSplit(w, "10", "7").ok, false);
   assert.ok(E.submitOwnSplit(w, "10", "7").message.indexOf("不是 16") !== -1);
   assert.strictEqual(E.submitOwnSplit(w, "0", "16").ok, false);

@@ -210,7 +210,6 @@
         ) : "");
     } else if (view.phase === "own") {
       body = rectHtml(view.strips, false) +
-        (view.comparison ? '<p class="shared-note">' + esc(view.comparison) + "</p>" : "") +
         (view.own.split ? "" : (
           "<h2>這次由你決定怎樣分</h2>" +
           '<p class="lead">長度是 16，闊度是 5。兩段都要是正整數，加起來等於 16。不要限於十位和個位。</p>' +
@@ -227,8 +226,7 @@
           '<div class="btn-row"><button type="submit" class="btn btn-primary">檢查</button></div></form>'
         ) : "");
     } else if (view.phase === "match") {
-      body = (view.comparison ? '<p class="shared-note">' + esc(view.comparison) + "</p>" : "") +
-        rectHtml(view.strips, true) +
+      body = rectHtml(view.strips, true) +
         "<h2>長是 x + 3，闊仍是 4</h2>" +
         '<p class="lead">x 是一段正的長度。先點一塊，再點它的面積。</p>' +
         '<div class="product-list" aria-label="面積選擇">' + view.products.map(function (item) {
@@ -512,7 +510,7 @@
     if (screen === "finale") body = renderFinale();
     document.getElementById("app").innerHTML = shell(body);
     var live = document.getElementById("live");
-    if (live && feedback) live.textContent = feedback.text;
+    if (live) live.textContent = feedback ? feedback.text : "";
     if (focusCheck) {
       var input = document.getElementById("x-entry");
       if (input) input.focus();
@@ -768,8 +766,11 @@
       return;
     }
     if (kind === "easy-area") {
+      var easyPhase = Engine.workshopView(workshop).phase;
       drafts.easyArea = document.getElementById("easy-area").value;
-      saveWorkshop(Engine.submitEasyArea(workshop, drafts.easyArea));
+      var easyResult = Engine.submitEasyArea(workshop, drafts.easyArea);
+      saveWorkshop(easyResult);
+      if (easyResult.ok && Engine.workshopView(workshop).phase !== easyPhase) feedback = null;
       render();
       return;
     }
@@ -781,18 +782,22 @@
       return;
     }
     if (kind === "own-areas") {
+      var ownPhase = Engine.workshopView(workshop).phase;
       drafts.ownAreas = document.getElementById("own-areas").value;
       var own = Engine.submitOwnAreas(workshop, drafts.ownAreas);
       saveWorkshop(own);
-      if (!own.ok) feedback.kind = own.message.indexOf("扣") !== -1 ? "bad" : "info";
+      if (own.ok && Engine.workshopView(workshop).phase !== ownPhase) feedback = null;
+      else if (!own.ok) feedback.kind = own.message.indexOf("扣") !== -1 ? "bad" : "info";
       render();
       return;
     }
     if (kind === "parts") {
+      var hardPhase = Engine.workshopView(workshop).phase;
       drafts.parts = document.getElementById("parts-entry").value;
       var parts = Engine.submitSplit(workshop, drafts.parts);
       saveWorkshop(parts);
-      if (!parts.ok) feedback.kind = parts.message.indexOf("扣") !== -1 ? "bad" : "info";
+      if (parts.ok && Engine.workshopView(workshop).phase !== hardPhase) feedback = null;
+      else if (!parts.ok) feedback.kind = parts.message.indexOf("扣") !== -1 ? "bad" : "info";
       render();
       return;
     }

@@ -765,7 +765,7 @@
       } : null,
       strips: strips,
       highlight: w.highlight.slice(),
-      comparison: w.hardOk ? (HARD.width + "×" + HARD.length + " = " + HARD.area + "，" + HARD.width + "×" + HARD.tens + " + " + HARD.width + "×" + HARD.units + " = " + HARD.area + "。") : "",
+      comparison: "",
       products: phase === "match" ? PRODUCTS.map(function (item) { return { id: item.id, label: item.label }; }) : [],
       matched: { x: w.matched.x, c: w.matched.c },
       bridge: both ? "所以 4(x + 3) = 4x + 12。兩塊都乘了闊度。" : "",
